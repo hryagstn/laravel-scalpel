@@ -139,6 +139,7 @@ return [
         'storage/framework/cache',
         'storage/framework/sessions',
         'storage/framework/views',
+        'storage/app/scalpel',
         'storage/app/private/scalpel',
     ],
 
