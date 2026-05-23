@@ -1,0 +1,56 @@
+{
+    "name": "hryagstn/laravel-scalpel",
+    "version": "1.0.0",
+    "description": "Filesystem intrusion evidence scanner for Laravel applications",
+    "keywords": [
+        "laravel",
+        "security",
+        "intrusion-detection",
+        "scanner",
+        "backdoor",
+        "obfuscation",
+        "filesystem"
+    ],
+    "license": "MIT",
+    "type": "library",
+    "authors": [
+        {
+            "name": "Harry Agustiana",
+            "email": "harry.agustiana@gmail.com"
+        }
+    ],
+    "require": {
+        "php": "^8.1",
+        "illuminate/console": "^10.0|^11.0|^12.0|^13.0",
+        "illuminate/config": "^10.0|^11.0|^12.0|^13.0",
+        "illuminate/filesystem": "^10.0|^11.0|^12.0|^13.0",
+        "illuminate/support": "^10.0|^11.0|^12.0|^13.0",
+        "symfony/finder": "^6.0|^7.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^8.0|^9.0|^10.0",
+        "phpunit/phpunit": "^10.0|^11.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Hryagstn\\Scalpel\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Hryagstn\\Scalpel\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Hryagstn\\Scalpel\\ScalpelServiceProvider"
+            ]
+        }
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

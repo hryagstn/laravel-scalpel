@@ -1,0 +1,99 @@
+name: Tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+# Mengaktifkan paksa runtime Node.js 24 untuk semua action JavaScript di dalam workflow ini
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Laravel 10 — supports PHP 8.1, 8.2, 8.3
+          - php: '8.1'
+            laravel: '^10.0'
+            testbench: '^8.0'
+          - php: '8.2'
+            laravel: '^10.0'
+            testbench: '^8.0'
+          - php: '8.3'
+            laravel: '^10.0'
+            testbench: '^8.0'
+
+          # Laravel 11 — supports PHP 8.2, 8.3, 8.4
+          - php: '8.2'
+            laravel: '^11.0'
+            testbench: '^9.0'
+          - php: '8.3'
+            laravel: '^11.0'
+            testbench: '^9.0'
+          - php: '8.4'
+            laravel: '^11.0'
+            testbench: '^9.0'
+
+          # Laravel 12 — supports PHP 8.2, 8.3, 8.4
+          - php: '8.2'
+            laravel: '^12.0'
+            testbench: '^10.0'
+          - php: '8.3'
+            laravel: '^12.0'
+            testbench: '^10.0'
+          - php: '8.4'
+            laravel: '^12.0'
+            testbench: '^10.0'
+
+    name: PHP ${{ matrix.php }} - Laravel ${{ matrix.laravel }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Mengarahkan environment runner ke Node 24 secara eksplisit
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, bcmath
+          coverage: none
+          tools: composer:v2
+
+      - name: Get Composer Cache Directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache Dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.json') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Install dependencies
+        run: |
+          composer require \
+            "illuminate/support:${{ matrix.laravel }}" \
+            "illuminate/console:${{ matrix.laravel }}" \
+            "illuminate/config:${{ matrix.laravel }}" \
+            "illuminate/filesystem:${{ matrix.laravel }}" \
+            "orchestra/testbench:${{ matrix.testbench }}" \
+            --no-interaction --no-update
+          composer update --prefer-dist --no-interaction --no-progress
+
+      - name: Execute tests
+        run: vendor/bin/phpunit
