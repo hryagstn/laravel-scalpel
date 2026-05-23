@@ -1,8 +1,8 @@
 [![Build Status](https://img.shields.io/github/actions/workflow/status/hryagstn/laravel-scalpel/tests.yml?branch=main&style=flat-square)](https://github.com/hryagstn/laravel-scalpel/actions)
-[![Latest Version on Packagist](https://img.shields.io/packagist/v/laravel-scalpel/laravel-scalpel.svg?style=flat-square)](https://packagist.org/packages/laravel-scalpel/laravel-scalpel)
-[![PHP Version](https://img.shields.io/packagist/php-v/laravel-scalpel/laravel-scalpel?style=flat-square)](https://packagist.org/packages/laravel-scalpel/laravel-scalpel)
-[![Laravel Version](https://img.shields.io/badge/laravel-10.x%20|%2011.x%20|%2012.x%20|%2013.x-blue?style=flat-square)](https://packagist.org/packages/laravel-scalpel/laravel-scalpel)
-[![License](https://img.shields.io/packagist/l/laravel-scalpel/laravel-scalpel?style=flat-square)](LICENSE)
+[![Latest Version on Packagist](https://img.shields.io/packagist/v/hryagstn/laravel-scalpel.svg?style=flat-square)](https://packagist.org/packages/hryagstn/laravel-scalpel)
+[![PHP Version](https://img.shields.io/packagist/php-v/hryagstn/laravel-scalpel?style=flat-square)](https://packagist.org/packages/hryagstn/laravel-scalpel)
+[![Laravel Version](https://img.shields.io/badge/laravel-10.x%20|%2011.x%20|%2012.x%20|%2013.x-blue?style=flat-square)](https://packagist.org/packages/hryagstn/laravel-scalpel)
+[![License](https://img.shields.io/packagist/l/hryagstn/laravel-scalpel?style=flat-square)](LICENSE)
 
 # 🔪 laravel-scalpel
 
@@ -30,7 +30,7 @@ preventive checklist.
 ## 📦 Installation
 
 ```bash
-composer require laravel-scalpel/laravel-scalpel
+composer require hryagstn/laravel-scalpel
 ```
 
 Publish the configuration file:
