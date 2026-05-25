@@ -14,14 +14,15 @@ class EnvIntegrityScannerTest extends TestCase
         parent::setUp();
 
         config([
-            'scalpel.excluded_paths' => ['vendor', 'node_modules', '.git'],
+            'scalpel.excluded_paths'              => ['node_modules', '.git'],
+            'scalpel.content_scan_excluded_paths' => ['vendor', 'bootstrap/cache'],
         ]);
     }
 
     public function test_flags_missing_env_file(): void
     {
         // No .env file created at all
-        $scanner = new EnvIntegrityScanner();
+        $scanner  = new EnvIntegrityScanner();
         $findings = $scanner->scan($this->tempDir);
 
         $this->assertCount(1, $findings);
@@ -32,16 +33,18 @@ class EnvIntegrityScannerTest extends TestCase
 
     public function test_flags_world_readable_permissions(): void
     {
+        if (PHP_OS_FAMILY === 'Windows') {
+            $this->markTestSkipped('Unix file permissions are not supported on Windows.');
+        }
+
         $envPath = $this->tempDir . '/.env';
         file_put_contents($envPath, 'APP_ENV=local');
 
-        // Set permissions to 0644 (world readable on macOS/Linux) or 0777
-        @chmod($envPath, 0664); // Make it group/world readable/writable depending on system
+        @chmod($envPath, 0664);
 
         $perms = fileperms($envPath);
-        // Only run permission check assertions if the OS supports world-read bits (not Windows, but we're on mac!)
         if ($perms & 0x0004) {
-            $scanner = new EnvIntegrityScanner();
+            $scanner  = new EnvIntegrityScanner();
             $findings = $scanner->scan($this->tempDir);
 
             $this->assertTrue($findings->hasSeverity(\Hryagstn\Scalpel\Data\Severity::HIGH));
@@ -64,10 +67,9 @@ class EnvIntegrityScannerTest extends TestCase
         ");
         @chmod($envPath, 0600);
 
-        $scanner = new EnvIntegrityScanner();
+        $scanner  = new EnvIntegrityScanner();
         $findings = $scanner->scan($this->tempDir);
 
-        // Should flag the extra keys
         $this->assertCount(1, $findings);
         $this->assertEquals('MEDIUM', $findings->all()[0]->severity->value);
         $this->assertStringContainsString('STRIPE_SECRET_KEY', $findings->all()[0]->description);
@@ -83,10 +85,9 @@ class EnvIntegrityScannerTest extends TestCase
         @mkdir($this->tempDir . '/public', 0777, true);
         file_put_contents($this->tempDir . '/public/.env', 'APP_ENV=production');
 
-        $scanner = new EnvIntegrityScanner();
+        $scanner  = new EnvIntegrityScanner();
         $findings = $scanner->scan($this->tempDir);
 
-        // Should flag the public/.env file
         $this->assertTrue($findings->hasSeverity(\Hryagstn\Scalpel\Data\Severity::CRITICAL));
         $files = array_map(fn ($f) => $f->file, $findings->all());
         $this->assertContains('public/.env', $files);

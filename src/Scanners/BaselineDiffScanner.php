@@ -20,21 +20,22 @@ class BaselineDiffScanner extends BaseScanner
     /**
      * Create a baseline snapshot of all files in the project.
      *
+     * Uses baseline_excluded_paths (in addition to global excluded_paths)
+     * but intentionally does NOT exclude content_scan_excluded_paths —
+     * vendor/ and other directories skipped by content scanners are still
+     * hashed here so that unauthorized modifications can be detected.
+     *
      * @param string $basePath The root directory of the Laravel project.
-     * @return array{files: int, size: int, created_at: string} Statistics about the created baseline.
+     * @return array{files: int, size: int, created_at: string}
      */
     public function createBaseline(string $basePath): array
     {
-        $basePath = rtrim($basePath, '/');
-        $excludedPaths = $this->getAllExcludedPaths();
+        $basePath      = rtrim($basePath, '/');
+        $excludedPaths = $this->getBaselineExcludedPaths();
 
-        $finder = new Finder();
-        $finder->in($basePath)
-            ->files()
-            ->ignoreDotFiles(false)
-            ->ignoreVCS(true);
+        $finder = $this->createBaselineFinder($basePath, $excludedPaths);
 
-        $snapshot = [];
+        $snapshot  = [];
         $totalSize = 0;
 
         foreach ($finder as $file) {
@@ -44,20 +45,20 @@ class BaselineDiffScanner extends BaseScanner
                 continue;
             }
 
-            $fileSize = $file->getSize();
+            $fileSize   = $file->getSize();
             $totalSize += $fileSize;
 
             $snapshot[$relativePath] = [
-                'hash' => hash_file('sha256', $file->getRealPath()),
-                'size' => $fileSize,
+                'hash'        => hash_file('sha256', $file->getRealPath()),
+                'size'        => $fileSize,
                 'modified_at' => $file->getMTime(),
             ];
         }
 
         $baselineData = [
             'created_at' => date('c'),
-            'base_path' => $basePath,
-            'files' => $snapshot,
+            'base_path'  => $basePath,
+            'files'      => $snapshot,
         ];
 
         Storage::put(
@@ -66,8 +67,8 @@ class BaselineDiffScanner extends BaseScanner
         );
 
         return [
-            'files' => count($snapshot),
-            'size' => $totalSize,
+            'files'      => count($snapshot),
+            'size'       => $totalSize,
             'created_at' => $baselineData['created_at'],
         ];
     }
@@ -124,16 +125,12 @@ class BaselineDiffScanner extends BaseScanner
 
         /** @var array<string, array{hash: string, size: int, modified_at: int}> $baselineFiles */
         $baselineFiles = $baseline['files'] ?? [];
-
-        $excludedPaths = $this->getAllExcludedPaths();
-
-        // Build current file map
-        $currentFiles = $this->buildCurrentFileMap($basePath, $excludedPaths);
+        $excludedPaths = $this->getBaselineExcludedPaths();
+        $currentFiles  = $this->buildCurrentFileMap($basePath, $excludedPaths);
 
         // Check for NEW and MODIFIED files
         foreach ($currentFiles as $relativePath => $fileData) {
             if (! isset($baselineFiles[$relativePath])) {
-                // NEW file — not in baseline
                 $findings->add(Finding::make(
                     severity: $this->severityForNewOrModified($relativePath),
                     file: $relativePath,
@@ -144,7 +141,6 @@ class BaselineDiffScanner extends BaseScanner
                 continue;
             }
 
-            // File exists in both — check if modified
             if ($fileData['hash'] !== $baselineFiles[$relativePath]['hash']) {
                 $findings->add(Finding::make(
                     severity: $this->severityForNewOrModified($relativePath),
@@ -160,7 +156,7 @@ class BaselineDiffScanner extends BaseScanner
             }
         }
 
-        // Check for DELETED files (in baseline but not on disk)
+        // Check for DELETED files
         foreach ($baselineFiles as $relativePath => $baselineData) {
             if (! isset($currentFiles[$relativePath])) {
                 $findings->add(Finding::make(
@@ -174,6 +170,67 @@ class BaselineDiffScanner extends BaseScanner
         }
 
         return $findings;
+    }
+
+    /**
+     * Get all paths excluded from baseline operations.
+     *
+     * This merges global excluded_paths with baseline_excluded_paths.
+     * Intentionally excludes content_scan_excluded_paths so that vendor/
+     * and similar directories are still monitored via hash comparison.
+     *
+     * @return string[]
+     */
+    public function getBaselineExcludedPaths(): array
+    {
+        $global = $this->getExcludedPaths();
+
+        /** @var string[] $baselineExcluded */
+        $baselineExcluded = config('scalpel.baseline_excluded_paths', []);
+
+        return array_unique(array_merge($global, $baselineExcluded));
+    }
+
+    /**
+     * Create a Finder instance optimised for baseline operations.
+     *
+     * Applies the same directory-vs-file exclusion logic as BaseScanner::createFinder()
+     * but uses baseline-specific excluded paths instead of content scan paths.
+     *
+     * @param string   $basePath
+     * @param string[] $excludedPaths
+     */
+    private function createBaselineFinder(string $basePath, array $excludedPaths): Finder
+    {
+        $finder = new Finder();
+        $finder->in($basePath)
+               ->files()
+               ->ignoreDotFiles(false)
+               ->ignoreVCS(true);
+
+        $excludedDirs  = [];
+        $excludedFiles = [];
+
+        foreach ($excludedPaths as $excluded) {
+            $excluded = rtrim($excluded, '/');
+            $fullPath = rtrim($basePath, '/') . '/' . $excluded;
+
+            if (is_dir($fullPath)) {
+                $excludedDirs[] = $excluded;
+            } else {
+                $excludedFiles[] = $excluded;
+            }
+        }
+
+        if (! empty($excludedDirs)) {
+            $finder->exclude($excludedDirs);
+        }
+
+        foreach ($excludedFiles as $file) {
+            $finder->notPath($file);
+        }
+
+        return $finder;
     }
 
     /**
@@ -200,21 +257,16 @@ class BaselineDiffScanner extends BaseScanner
     }
 
     /**
-     * Build a map of all current files with their hashes.
+     * Build a map of current files with their hashes.
      *
-     * @param string $basePath
+     * @param string   $basePath
      * @param string[] $excludedPaths
      * @return array<string, array{hash: string, size: int, modified_at: int}>
      */
     private function buildCurrentFileMap(string $basePath, array $excludedPaths): array
     {
-        $finder = new Finder();
-        $finder->in($basePath)
-            ->files()
-            ->ignoreDotFiles(false)
-            ->ignoreVCS(true);
-
-        $files = [];
+        $finder = $this->createBaselineFinder($basePath, $excludedPaths);
+        $files  = [];
 
         foreach ($finder as $file) {
             $relativePath = $this->relativePath($file->getRealPath(), $basePath);
@@ -224,8 +276,8 @@ class BaselineDiffScanner extends BaseScanner
             }
 
             $files[$relativePath] = [
-                'hash' => hash_file('sha256', $file->getRealPath()),
-                'size' => $file->getSize(),
+                'hash'        => hash_file('sha256', $file->getRealPath()),
+                'size'        => $file->getSize(),
                 'modified_at' => $file->getMTime(),
             ];
         }
@@ -234,7 +286,7 @@ class BaselineDiffScanner extends BaseScanner
     }
 
     /**
-     * Determine severity for a new or modified file based on its extension.
+     * Determine severity for a new or modified file.
      */
     private function severityForNewOrModified(string $relativePath): Severity
     {
@@ -248,31 +300,14 @@ class BaselineDiffScanner extends BaseScanner
     }
 
     /**
-     * Determine severity for a deleted file based on its name/type.
+     * Determine severity for a deleted file.
      */
     private function severityForDeleted(string $relativePath): Severity
     {
-        $basename = basename($relativePath);
-
-        if ($basename === '.env') {
+        if (basename($relativePath) === '.env') {
             return Severity::CRITICAL;
         }
 
         return Severity::MEDIUM;
-    }
-
-    /**
-     * Get all paths to exclude (global + baseline-specific).
-     *
-     * @return string[]
-     */
-    private function getAllExcludedPaths(): array
-    {
-        $global = $this->getExcludedPaths();
-
-        /** @var string[] $baselineExcluded */
-        $baselineExcluded = config('scalpel.baseline_excluded_paths', []);
-
-        return array_merge($global, $baselineExcluded);
     }
 }

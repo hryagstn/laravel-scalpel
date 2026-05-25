@@ -391,6 +391,12 @@ these commands, investigate immediately.
 
 This ensures the baseline always reflects the post-deployment known-good state.
 
+## Automation & Monitoring
+
+Pair laravel-scalpel with [n8n-bastion](https://github.com/hryagstn/n8n-bastion)
+for automated scheduled scanning and real-time Telegram alerts when
+CRITICAL or HIGH findings are detected on your VPS.
+
 ---
 
 ## 🤝 Contributing

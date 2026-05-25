@@ -53,18 +53,47 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Excluded Paths
+    | Excluded Paths (Global)
     |--------------------------------------------------------------------------
     |
-    | Paths or patterns to exclude from ALL scans. These paths will be skipped
-    | by every scanner. Paths are relative to the project root.
+    | Paths excluded from ALL scanners including BaselineDiffScanner.
+    | Keep this list minimal — only paths that have no security relevance
+    | whatsoever and should never be monitored.
+    |
+    | Note: vendor/ is intentionally NOT here. It is excluded from content
+    | scanners via content_scan_excluded_paths but is still monitored by
+    | BaselineDiffScanner via hash comparison to detect unauthorized
+    | modifications to installed packages.
     |
     */
 
     'excluded_paths' => [
-        'vendor',
         'node_modules',
         '.git',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Content Scan Excluded Paths
+    |--------------------------------------------------------------------------
+    |
+    | Paths excluded from content scanners only (ObfuscatedCodeScanner,
+    | StructuralAnomalyScanner, HtaccessScanner).
+    |
+    | These paths are skipped during content analysis for performance reasons,
+    | but are still monitored by BaselineDiffScanner via SHA-256 hash
+    | comparison. If an attacker plants a backdoor in vendor/, the baseline
+    | diff will detect the new or modified file even though the content
+    | scanner does not scan vendor/ on every run.
+    |
+    | To also scan vendor/ for obfuscated code (slower, recommended after
+    | deployments): php artisan scalpel:scan --include-vendor
+    | (available in a future release)
+    |
+    */
+
+    'content_scan_excluded_paths' => [
+        'vendor',
         'bootstrap/cache',
     ],
 
@@ -128,9 +157,14 @@ return [
     | Baseline Excluded Paths
     |--------------------------------------------------------------------------
     |
-    | Additional paths to exclude from baseline snapshot creation and diff
-    | comparison. These are in addition to the global excluded_paths above.
-    | Paths are relative to the project root.
+    | Paths excluded from BaselineDiffScanner in addition to global
+    | excluded_paths. These are high-churn paths that change frequently
+    | during normal operation and would produce excessive false positives
+    | if included in baseline comparisons.
+    |
+    | bootstrap/cache is intentionally NOT here — it is a high-value target
+    | for attackers who want to inject malicious service providers.
+    | Changes here should always be investigated.
     |
     */
 

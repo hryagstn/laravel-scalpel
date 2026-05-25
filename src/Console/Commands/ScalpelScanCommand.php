@@ -242,7 +242,7 @@ final class ScalpelScanCommand extends Command
         $this->line("  <fg=white;options=bold>Total findings: {$findings->count()}</>");
 
         if ($findings->hasCriticalOrHigh()) {
-            $this->error('  ⚠  CRITICAL or HIGH severity findings detected. Investigate immediately!');
+            $this->line('  <fg=red;options=bold>⚠  CRITICAL or HIGH severity findings detected. Investigate immediately!</>');
         }
 
         $this->newLine();

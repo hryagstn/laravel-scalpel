@@ -58,6 +58,12 @@ class EnvIntegrityScanner extends BaseScanner
      */
     private function checkPermissions(string $envPath, FindingCollection $findings): void
     {
+        // Windows does not support Unix file permission bits;
+        // fileperms() always reports files as world-readable there.
+        if (PHP_OS_FAMILY === 'Windows') {
+            return;
+        }
+
         $perms = @fileperms($envPath);
 
         if ($perms === false) {

@@ -24,12 +24,8 @@ class ScalpelDiffCommandTest extends TestCase
 
     protected function tearDown(): void
     {
-        // Bersihkan baseline yang mungkin tersisa di storage Testbench
-        $baselineFullPath = storage_path('app/scalpel/baseline.json');
-        if (file_exists($baselineFullPath)) {
-            @unlink($baselineFullPath);
-            @rmdir(dirname($baselineFullPath));
-        }
+        // Bersihkan baseline yang mungkin tersisa di storage
+        \Illuminate\Support\Facades\Storage::delete(config('scalpel.baseline_path', 'scalpel/baseline.json'));
 
         parent::tearDown();
     }
@@ -74,10 +70,7 @@ class ScalpelDiffCommandTest extends TestCase
     public function test_diff_command_fails_if_no_baseline_exists(): void
     {
         // Pastikan tidak ada baseline sebelum test
-        $baselineFullPath = storage_path('app/scalpel/baseline.json');
-        if (file_exists($baselineFullPath)) {
-            @unlink($baselineFullPath);
-        }
+        \Illuminate\Support\Facades\Storage::delete(config('scalpel.baseline_path', 'scalpel/baseline.json'));
 
         $this->artisan('scalpel:diff')
             ->expectsOutputToContain('No baseline snapshot found')
@@ -183,10 +176,7 @@ class ScalpelDiffCommandTest extends TestCase
     public function test_diff_command_artisan_returns_exit_code_1_when_baseline_missing(): void
     {
         // Pastikan baseline tidak ada
-        $baselineFullPath = storage_path('app/scalpel/baseline.json');
-        if (file_exists($baselineFullPath)) {
-            @unlink($baselineFullPath);
-        }
+        \Illuminate\Support\Facades\Storage::delete(config('scalpel.baseline_path', 'scalpel/baseline.json'));
 
         $this->artisan('scalpel:diff')
             ->assertExitCode(1);

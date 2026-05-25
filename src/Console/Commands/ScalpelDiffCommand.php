@@ -47,8 +47,8 @@ final class ScalpelDiffCommand extends Command
 
         // Check if baseline exists
         if (! $scanner->baselineExists()) {
-            $this->error('  No baseline snapshot found.');
-            $this->line('  <fg=gray>Run <fg=white>php artisan scalpel:baseline</> first to create a snapshot.</>');
+            $this->info('  No baseline snapshot found.');
+            $this->info('  Run "php artisan scalpel:baseline" first to create a snapshot.');
             $this->newLine();
 
             return 1;
@@ -136,7 +136,7 @@ final class ScalpelDiffCommand extends Command
         $this->line("  <fg=white;options=bold>Total changes detected: {$findings->count()}</>");
 
         if ($findings->hasCriticalOrHigh()) {
-            $this->error('  ⚠  CRITICAL or HIGH severity changes detected. Investigate immediately!');
+            $this->line('  <fg=red;options=bold>⚠  CRITICAL or HIGH severity changes detected. Investigate immediately!</>');
         }
 
         $this->newLine();
