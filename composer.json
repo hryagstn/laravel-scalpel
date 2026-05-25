@@ -1,6 +1,5 @@
 {
     "name": "hryagstn/laravel-scalpel",
-    "version": "1.0.0",
     "description": "Filesystem intrusion evidence scanner for Laravel applications",
     "keywords": [
         "laravel",
