@@ -93,4 +93,49 @@ class BaselineDiffScannerTest extends TestCase
         $this->assertNotNull($deletedEnv);
         $this->assertEquals('CRITICAL', $deletedEnv->severity->value);
     }
+
+    public function test_progress_callback_is_triggered_during_baseline_creation_and_scan(): void
+    {
+        $scanner = new BaselineDiffScanner();
+
+        @mkdir($this->tempDir . '/app', 0777, true);
+        file_put_contents($this->tempDir . '/app/User.php', '<?php class User {}');
+        file_put_contents($this->tempDir . '/app/Helper.php', '<?php class Helper {}');
+
+        // Test progress during creation
+        $creationEvents = [];
+        $scanner->setProgressCallback(function (string $event, array $data = []) use (&$creationEvents) {
+            $creationEvents[] = [$event, $data];
+        });
+
+        $scanner->createBaseline($this->tempDir);
+
+        $this->assertNotEmpty($creationEvents);
+        $this->assertEquals('start', $creationEvents[0][0]);
+        $this->assertEquals(2, $creationEvents[0][1]['total']);
+        
+        $advanceEvents = array_filter($creationEvents, fn($e) => $e[0] === 'advance');
+        $this->assertCount(2, $advanceEvents);
+
+        $finishEvent = end($creationEvents);
+        $this->assertEquals('finish', $finishEvent[0]);
+
+        // Test progress during scan (comparison)
+        $scanEvents = [];
+        $scanner->setProgressCallback(function (string $event, array $data = []) use (&$scanEvents) {
+            $scanEvents[] = [$event, $data];
+        });
+
+        $scanner->scan($this->tempDir);
+
+        $this->assertNotEmpty($scanEvents);
+        $this->assertEquals('start', $scanEvents[0][0]);
+        $this->assertEquals(2, $scanEvents[0][1]['total']);
+
+        $scanAdvanceEvents = array_filter($scanEvents, fn($e) => $e[0] === 'advance');
+        $this->assertCount(2, $scanAdvanceEvents);
+
+        $scanFinishEvent = end($scanEvents);
+        $this->assertEquals('finish', $scanFinishEvent[0]);
+    }
 }

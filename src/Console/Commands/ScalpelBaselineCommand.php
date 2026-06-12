@@ -30,8 +30,9 @@ final class ScalpelBaselineCommand extends Command
      */
     public function handle(Scalpel $scalpel): int
     {
+        $version = Scalpel::version();
         $this->newLine();
-        $this->line('  🔬 <fg=cyan;options=bold>Laravel Scalpel</> — Baseline Snapshot');
+        $this->line("  🔬 <fg=cyan;options=bold>Laravel Scalpel</> v{$version} — Baseline Snapshot");
         $this->newLine();
 
         $scanner = $scalpel->getScanner('Baseline Diff');
@@ -57,8 +58,31 @@ final class ScalpelBaselineCommand extends Command
 
         $this->info('  ▸ Creating baseline snapshot...');
 
+        $progressBar = null;
+        $scanner->setProgressCallback(function (string $event, array $data) use (&$progressBar) {
+            if ($event === 'start') {
+                $progressBar = $this->output->createProgressBar($data['total']);
+                $progressBar->setFormat('  %current%/%max% [%bar%] %percent:3s%% -- %message%');
+                $progressBar->setMessage('Scanning files...');
+                $progressBar->start();
+            } elseif ($event === 'advance' && $progressBar) {
+                $message = $data['file'];
+                if (strlen($message) > 40) {
+                    $message = '...' . substr($message, -37);
+                }
+                $progressBar->setMessage($message);
+                $progressBar->advance();
+            } elseif ($event === 'finish' && $progressBar) {
+                $progressBar->setMessage('Complete!');
+                $progressBar->finish();
+                $this->newLine();
+            }
+        });
+
         $basePath = (string) base_path();
         $baseline = $scanner->createBaseline($basePath);
+
+        $scanner->setProgressCallback(null);
 
         $fileCount = $baseline['files'];
 

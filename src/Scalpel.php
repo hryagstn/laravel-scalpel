@@ -96,4 +96,31 @@ final class Scalpel
             new EnvIntegrityScanner(),
         ];
     }
+
+    /**
+     * Get the dynamic version of the package.
+     */
+    public static function version(): string
+    {
+        try {
+            if (class_exists(\Composer\InstalledVersions::class)) {
+                return \Composer\InstalledVersions::getPrettyVersion('hryagstn/laravel-scalpel') ?? '1.0.0-dev';
+            }
+        } catch (\OutOfBoundsException) {
+            // Package is not installed via composer in the current project
+        }
+
+        $composerPath = dirname(__DIR__) . '/composer.json';
+        if (file_exists($composerPath)) {
+            $content = file_get_contents($composerPath);
+            if ($content !== false) {
+                $data = json_decode($content, true);
+                if (is_array($data) && isset($data['version'])) {
+                    return (string) $data['version'];
+                }
+            }
+        }
+
+        return '1.0.0-dev';
+    }
 }

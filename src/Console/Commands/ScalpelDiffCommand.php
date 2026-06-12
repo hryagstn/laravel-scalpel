@@ -33,8 +33,9 @@ final class ScalpelDiffCommand extends Command
      */
     public function handle(Scalpel $scalpel): int
     {
+        $version = Scalpel::version();
         $this->newLine();
-        $this->line('  🔬 <fg=cyan;options=bold>Laravel Scalpel</> — Baseline Diff');
+        $this->line("  🔬 <fg=cyan;options=bold>Laravel Scalpel</> v{$version} — Baseline Diff");
         $this->newLine();
 
         $scanner = $scalpel->getScanner('Baseline Diff');
@@ -54,14 +55,42 @@ final class ScalpelDiffCommand extends Command
             return 1;
         }
 
-        $this->info('  ▸ Comparing filesystem against baseline...');
-        $this->newLine();
+        /** @var string $format */
+        $format = $this->option('format');
+
+        if ($format !== 'json') {
+            $this->info('  ▸ Comparing filesystem against baseline...');
+            $this->newLine();
+
+            $progressBar = null;
+            $scanner->setProgressCallback(function (string $event, array $data) use (&$progressBar) {
+                if ($event === 'start') {
+                    $progressBar = $this->output->createProgressBar($data['total']);
+                    $progressBar->setFormat('  %current%/%max% [%bar%] %percent:3s%% -- %message%');
+                    $progressBar->setMessage('Scanning files...');
+                    $progressBar->start();
+                } elseif ($event === 'advance' && $progressBar) {
+                    $message = $data['file'];
+                    if (strlen($message) > 40) {
+                        $message = '...' . substr($message, -37);
+                    }
+                    $progressBar->setMessage($message);
+                    $progressBar->advance();
+                } elseif ($event === 'finish' && $progressBar) {
+                    $progressBar->setMessage('Complete!');
+                    $progressBar->finish();
+                    $this->newLine();
+                    $this->newLine();
+                }
+            });
+        }
 
         $basePath = (string) base_path();
         $findings = $scanner->scan($basePath);
 
-        /** @var string $format */
-        $format = $this->option('format');
+        if ($format !== 'json') {
+            $scanner->setProgressCallback(null);
+        }
 
         if ($format === 'json') {
             $this->outputJson($findings);

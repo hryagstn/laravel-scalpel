@@ -81,12 +81,25 @@ final class ScalpelScanCommand extends Command
      */
     private function displayBanner(): void
     {
+        $version = Scalpel::version();
         $this->newLine();
         $this->line('  ╔══════════════════════════════════════════════════╗');
-        $this->line('  ║  🔬 <fg=cyan;options=bold>Laravel Scalpel</> — Intrusion Evidence Scanner  ║');
-        $this->line('  ║  <fg=gray>v1.0.0 • Filesystem Security Analysis</>           ║');
+        $this->line($this->formatBoxLine('  🔬 <fg=cyan;options=bold>Laravel Scalpel</> — Intrusion Evidence Scanner  '));
+        $this->line($this->formatBoxLine("  <fg=gray>v{$version} • Filesystem Security Analysis</>"));
         $this->line('  ╚══════════════════════════════════════════════════╝');
         $this->newLine();
+    }
+
+    /**
+     * Format a line to fit perfectly inside the banner's double box.
+     */
+    private function formatBoxLine(string $content, int $innerWidth = 50): string
+    {
+        $visibleContent = preg_replace('/<[^>]*>/', '', $content);
+        $visibleLength = mb_strlen($visibleContent ?? '', 'UTF-8');
+        $padLength = max(0, $innerWidth - $visibleLength);
+
+        return "  ║" . $content . str_repeat(' ', $padLength) . "║";
     }
 
     /**
@@ -118,10 +131,10 @@ final class ScalpelScanCommand extends Command
     private function runAllScanners(Scalpel $scalpel, string $basePath): FindingCollection
     {
         $collection = new FindingCollection();
+        $format = $this->option('format');
 
         foreach ($scalpel->getScanners() as $scanner) {
-            $this->info("  ▸ Running scanner: {$scanner->name()}");
-            $collection->merge($scanner->scan($basePath));
+            $collection->merge($this->runScanner($scalpel, $scanner, $basePath, $format));
         }
 
         $this->newLine();
@@ -137,17 +150,57 @@ final class ScalpelScanCommand extends Command
     private function runSelectedScanners(Scalpel $scalpel, string $basePath, array $scannerNames): FindingCollection
     {
         $collection = new FindingCollection();
+        $format = $this->option('format');
 
         foreach ($scalpel->getScanners() as $scanner) {
             if (in_array($scanner->name(), $scannerNames, true)) {
-                $this->info("  ▸ Running scanner: {$scanner->name()}");
-                $collection->merge($scanner->scan($basePath));
+                $collection->merge($this->runScanner($scalpel, $scanner, $basePath, $format));
             }
         }
 
         $this->newLine();
 
         return $collection;
+    }
+
+    /**
+     * Run a single scanner, optionally showing progress.
+     */
+    private function runScanner(Scalpel $scalpel, \Hryagstn\Scalpel\Contracts\ScannerInterface $scanner, string $basePath, string $format): FindingCollection
+    {
+        $this->info("  ▸ Running scanner: {$scanner->name()}");
+
+        $hasProgress = $format !== 'json' && $scanner instanceof \Hryagstn\Scalpel\Scanners\BaseScanner;
+        if ($hasProgress) {
+            $progressBar = null;
+            $scanner->setProgressCallback(function (string $event, array $data) use (&$progressBar) {
+                if ($event === 'start') {
+                    $progressBar = $this->output->createProgressBar($data['total']);
+                    $progressBar->setFormat('  %current%/%max% [%bar%] %percent:3s%% -- %message%');
+                    $progressBar->setMessage('Scanning files...');
+                    $progressBar->start();
+                } elseif ($event === 'advance' && $progressBar) {
+                    $message = $data['file'];
+                    if (strlen($message) > 40) {
+                        $message = '...' . substr($message, -37);
+                    }
+                    $progressBar->setMessage($message);
+                    $progressBar->advance();
+                } elseif ($event === 'finish' && $progressBar) {
+                    $progressBar->setMessage('Complete!');
+                    $progressBar->finish();
+                    $this->newLine();
+                }
+            });
+        }
+
+        $findings = $scanner->scan($basePath);
+
+        if ($hasProgress) {
+            $scanner->setProgressCallback(null);
+        }
+
+        return $findings;
     }
 
     /**

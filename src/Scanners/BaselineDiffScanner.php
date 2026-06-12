@@ -35,8 +35,12 @@ class BaselineDiffScanner extends BaseScanner
 
         $finder = $this->createBaselineFinder($basePath, $excludedPaths);
 
+        $totalFiles = count($finder);
+        $this->notifyProgress('start', ['total' => $totalFiles]);
+
         $snapshot  = [];
         $totalSize = 0;
+        $processed = 0;
 
         foreach ($finder as $file) {
             $relativePath = $this->relativePath($file->getRealPath(), $basePath);
@@ -53,7 +57,16 @@ class BaselineDiffScanner extends BaseScanner
                 'size'        => $fileSize,
                 'modified_at' => $file->getMTime(),
             ];
+
+            $processed++;
+            $this->notifyProgress('advance', [
+                'current' => $processed,
+                'total' => $totalFiles,
+                'file' => $relativePath,
+            ]);
         }
+
+        $this->notifyProgress('finish');
 
         $baselineData = [
             'created_at' => date('c'),
@@ -266,7 +279,12 @@ class BaselineDiffScanner extends BaseScanner
     private function buildCurrentFileMap(string $basePath, array $excludedPaths): array
     {
         $finder = $this->createBaselineFinder($basePath, $excludedPaths);
+
+        $totalFiles = count($finder);
+        $this->notifyProgress('start', ['total' => $totalFiles]);
+
         $files  = [];
+        $processed = 0;
 
         foreach ($finder as $file) {
             $relativePath = $this->relativePath($file->getRealPath(), $basePath);
@@ -280,7 +298,16 @@ class BaselineDiffScanner extends BaseScanner
                 'size'        => $file->getSize(),
                 'modified_at' => $file->getMTime(),
             ];
+
+            $processed++;
+            $this->notifyProgress('advance', [
+                'current' => $processed,
+                'total' => $totalFiles,
+                'file' => $relativePath,
+            ]);
         }
+
+        $this->notifyProgress('finish');
 
         return $files;
     }

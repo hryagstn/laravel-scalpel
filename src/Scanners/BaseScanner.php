@@ -11,6 +11,31 @@ use Symfony\Component\Finder\Finder;
 abstract class BaseScanner implements ScannerInterface
 {
     /**
+     * Progress listener callback.
+     *
+     * @var \Closure|null
+     */
+    protected ?\Closure $progressCallback = null;
+
+    /**
+     * Set the progress callback.
+     */
+    public function setProgressCallback(?\Closure $callback): void
+    {
+        $this->progressCallback = $callback;
+    }
+
+    /**
+     * Notify progress update.
+     */
+    protected function notifyProgress(string $event, array $data = []): void
+    {
+        if ($this->progressCallback !== null) {
+            ($this->progressCallback)($event, $data);
+        }
+    }
+
+    /**
      * Get the globally excluded paths from config.
      * These paths are excluded from ALL scanners including baseline.
      *
