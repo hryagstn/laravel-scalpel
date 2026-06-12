@@ -86,13 +86,16 @@ jobs:
 
       - name: Install dependencies
         run: |
+          composer config policy.advisories.block false
           composer require \
             "illuminate/support:${{ matrix.laravel }}" \
             "illuminate/console:${{ matrix.laravel }}" \
             "illuminate/config:${{ matrix.laravel }}" \
             "illuminate/filesystem:${{ matrix.laravel }}" \
-            "orchestra/testbench:${{ matrix.testbench }}" \
             --no-interaction --no-update
+          composer require \
+            "orchestra/testbench:${{ matrix.testbench }}" \
+            --dev --no-interaction --no-update
           composer update --prefer-dist --no-interaction --no-progress --no-audit
 
       - name: Execute tests
