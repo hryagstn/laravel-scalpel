@@ -109,7 +109,7 @@ class ScalpelScanCommandTest extends TestCase
     {
         $this->createSandboxFile('.env', 'APP_ENV=testing');
         $this->createSandboxFile('.env.example', 'APP_ENV=');
-        $this->artisan('scalpel:baseline --force')->assertExitCode(0);
+        $this->createBaselineProgrammatically();
 
         $exitCode = \Illuminate\Support\Facades\Artisan::call('scalpel:scan', ['--format' => 'json']);
         $this->assertSame(0, $exitCode);
@@ -124,7 +124,7 @@ class ScalpelScanCommandTest extends TestCase
     {
         $this->createSandboxFile('.env', 'APP_ENV=testing');
         $this->createSandboxFile('.env.example', 'APP_ENV=');
-        $this->artisan('scalpel:baseline --force')->assertExitCode(0);
+        $this->createBaselineProgrammatically();
 
         $exitCode = \Illuminate\Support\Facades\Artisan::call('scalpel:scan', ['--no-banner' => true]);
         $this->assertSame(0, $exitCode);
@@ -138,7 +138,7 @@ class ScalpelScanCommandTest extends TestCase
     {
         $this->createSandboxFile('.env', 'APP_ENV=testing');
         $this->createSandboxFile('.env.example', 'APP_ENV=');
-        $this->artisan('scalpel:baseline --force')->assertExitCode(0);
+        $this->createBaselineProgrammatically();
 
         $exitCode = \Illuminate\Support\Facades\Artisan::call('scalpel:scan', ['--no-ansi' => true]);
         $this->assertSame(0, $exitCode);
@@ -153,7 +153,7 @@ class ScalpelScanCommandTest extends TestCase
         config(['scalpel.suppress_banner' => true]);
         $this->createSandboxFile('.env', 'APP_ENV=testing');
         $this->createSandboxFile('.env.example', 'APP_ENV=');
-        $this->artisan('scalpel:baseline --force')->assertExitCode(0);
+        $this->createBaselineProgrammatically();
 
         $exitCode = \Illuminate\Support\Facades\Artisan::call('scalpel:scan');
         $this->assertSame(0, $exitCode);
@@ -161,5 +161,16 @@ class ScalpelScanCommandTest extends TestCase
         $output = \Illuminate\Support\Facades\Artisan::output();
         $this->assertStringNotContainsString('Laravel Scalpel', $output);
         $this->assertStringContainsString('Running scanner', $output);
+    }
+
+    private function createBaselineProgrammatically(): void
+    {
+        /** @var \Hryagstn\Scalpel\Scalpel $scalpel */
+        $scalpel = app(\Hryagstn\Scalpel\Scalpel::class);
+
+        /** @var \Hryagstn\Scalpel\Scanners\BaselineDiffScanner $scanner */
+        $scanner = $scalpel->getScanner('Baseline Diff');
+
+        $scanner->createBaseline(base_path());
     }
 }
