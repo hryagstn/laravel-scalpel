@@ -104,4 +104,62 @@ class ScalpelScanCommandTest extends TestCase
             ->doesntExpectOutput('Running scanner: Obfuscated Code')
             ->assertExitCode(0);
     }
+
+    public function test_scan_command_json_format_suppresses_banner_and_progress(): void
+    {
+        $this->createSandboxFile('.env', 'APP_ENV=testing');
+        $this->createSandboxFile('.env.example', 'APP_ENV=');
+        $this->artisan('scalpel:baseline --force')->assertExitCode(0);
+
+        $exitCode = \Illuminate\Support\Facades\Artisan::call('scalpel:scan', ['--format' => 'json']);
+        $this->assertSame(0, $exitCode);
+
+        $output = \Illuminate\Support\Facades\Artisan::output();
+        $this->assertStringNotContainsString('Laravel Scalpel', $output);
+        $this->assertStringNotContainsString('Running scanner', $output);
+        $this->assertStringContainsString('"total"', $output);
+    }
+
+    public function test_scan_command_no_banner_option_suppresses_banner(): void
+    {
+        $this->createSandboxFile('.env', 'APP_ENV=testing');
+        $this->createSandboxFile('.env.example', 'APP_ENV=');
+        $this->artisan('scalpel:baseline --force')->assertExitCode(0);
+
+        $exitCode = \Illuminate\Support\Facades\Artisan::call('scalpel:scan', ['--no-banner' => true]);
+        $this->assertSame(0, $exitCode);
+
+        $output = \Illuminate\Support\Facades\Artisan::output();
+        $this->assertStringNotContainsString('Laravel Scalpel', $output);
+        $this->assertStringContainsString('Running scanner', $output);
+    }
+
+    public function test_scan_command_no_ansi_option_suppresses_banner(): void
+    {
+        $this->createSandboxFile('.env', 'APP_ENV=testing');
+        $this->createSandboxFile('.env.example', 'APP_ENV=');
+        $this->artisan('scalpel:baseline --force')->assertExitCode(0);
+
+        $exitCode = \Illuminate\Support\Facades\Artisan::call('scalpel:scan', ['--no-ansi' => true]);
+        $this->assertSame(0, $exitCode);
+
+        $output = \Illuminate\Support\Facades\Artisan::output();
+        $this->assertStringNotContainsString('Laravel Scalpel', $output);
+        $this->assertStringContainsString('Running scanner', $output);
+    }
+
+    public function test_scan_command_config_suppress_banner_suppresses_banner(): void
+    {
+        config(['scalpel.suppress_banner' => true]);
+        $this->createSandboxFile('.env', 'APP_ENV=testing');
+        $this->createSandboxFile('.env.example', 'APP_ENV=');
+        $this->artisan('scalpel:baseline --force')->assertExitCode(0);
+
+        $exitCode = \Illuminate\Support\Facades\Artisan::call('scalpel:scan');
+        $this->assertSame(0, $exitCode);
+
+        $output = \Illuminate\Support\Facades\Artisan::output();
+        $this->assertStringNotContainsString('Laravel Scalpel', $output);
+        $this->assertStringContainsString('Running scanner', $output);
+    }
 }

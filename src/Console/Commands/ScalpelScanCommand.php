@@ -18,7 +18,8 @@ final class ScalpelScanCommand extends Command
      */
     protected $signature = 'scalpel:scan
         {--only= : Comma-separated list of scanners to run}
-        {--format=table : Output format (table or json)}';
+        {--format=table : Output format (table or json)}
+        {--no-banner : Suppress the banner/header}';
 
     /**
      * The console command description.
@@ -45,7 +46,9 @@ final class ScalpelScanCommand extends Command
      */
     public function handle(Scalpel $scalpel): int
     {
-        $this->displayBanner();
+        if (! $this->shouldSuppressBanner()) {
+            $this->displayBanner();
+        }
 
         $basePath = (string) base_path();
 
@@ -91,6 +94,17 @@ final class ScalpelScanCommand extends Command
     }
 
     /**
+     * Determine if the banner/header should be suppressed.
+     */
+    private function shouldSuppressBanner(): bool
+    {
+        return $this->option('format') === 'json'
+            || ($this->hasOption('no-ansi') && $this->option('no-ansi'))
+            || $this->option('no-banner')
+            || config('scalpel.suppress_banner', false);
+    }
+
+    /**
      * Format a line to fit perfectly inside the banner's double box.
      */
     private function formatBoxLine(string $content, int $innerWidth = 50): string
@@ -118,7 +132,9 @@ final class ScalpelScanCommand extends Command
             if (isset(self::SCANNER_ALIASES[$alias])) {
                 $resolved[] = self::SCANNER_ALIASES[$alias];
             } else {
-                $this->warn("Unknown scanner alias: {$alias}");
+                if ($this->option('format') !== 'json') {
+                    $this->warn("Unknown scanner alias: {$alias}");
+                }
             }
         }
 
@@ -137,7 +153,9 @@ final class ScalpelScanCommand extends Command
             $collection->merge($this->runScanner($scalpel, $scanner, $basePath, $format));
         }
 
-        $this->newLine();
+        if ($format !== 'json') {
+            $this->newLine();
+        }
 
         return $collection;
     }
@@ -158,7 +176,9 @@ final class ScalpelScanCommand extends Command
             }
         }
 
-        $this->newLine();
+        if ($format !== 'json') {
+            $this->newLine();
+        }
 
         return $collection;
     }
@@ -168,7 +188,9 @@ final class ScalpelScanCommand extends Command
      */
     private function runScanner(Scalpel $scalpel, \Hryagstn\Scalpel\Contracts\ScannerInterface $scanner, string $basePath, string $format): FindingCollection
     {
-        $this->info("  ▸ Running scanner: {$scanner->name()}");
+        if ($format !== 'json') {
+            $this->info("  ▸ Running scanner: {$scanner->name()}");
+        }
 
         $hasProgress = $format !== 'json' && $scanner instanceof \Hryagstn\Scalpel\Scanners\BaseScanner;
         if ($hasProgress) {

@@ -16,7 +16,8 @@ final class ScalpelBaselineCommand extends Command
      * @var string
      */
     protected $signature = 'scalpel:baseline
-        {--force : Overwrite existing baseline without confirmation}';
+        {--force : Overwrite existing baseline without confirmation}
+        {--no-banner : Suppress the banner/header}';
 
     /**
      * The console command description.
@@ -30,10 +31,12 @@ final class ScalpelBaselineCommand extends Command
      */
     public function handle(Scalpel $scalpel): int
     {
-        $version = Scalpel::version();
-        $this->newLine();
-        $this->line("  🔬 <fg=cyan;options=bold>Laravel Scalpel</> v{$version} — Baseline Snapshot");
-        $this->newLine();
+        if (! $this->shouldSuppressBanner()) {
+            $version = Scalpel::version();
+            $this->newLine();
+            $this->line("  🔬 <fg=cyan;options=bold>Laravel Scalpel</> v{$version} — Baseline Snapshot");
+            $this->newLine();
+        }
 
         $scanner = $scalpel->getScanner('Baseline Diff');
 
@@ -96,5 +99,15 @@ final class ScalpelBaselineCommand extends Command
         $this->newLine();
 
         return 0;
+    }
+
+    /**
+     * Determine if the banner/header should be suppressed.
+     */
+    private function shouldSuppressBanner(): bool
+    {
+        return ($this->hasOption('no-ansi') && $this->option('no-ansi'))
+            || $this->option('no-banner')
+            || config('scalpel.suppress_banner', false);
     }
 }

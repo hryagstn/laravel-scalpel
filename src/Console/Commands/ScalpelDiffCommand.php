@@ -19,7 +19,8 @@ final class ScalpelDiffCommand extends Command
      * @var string
      */
     protected $signature = 'scalpel:diff
-        {--format=table : Output format (table or json)}';
+        {--format=table : Output format (table or json)}
+        {--no-banner : Suppress the banner/header}';
 
     /**
      * The console command description.
@@ -33,10 +34,12 @@ final class ScalpelDiffCommand extends Command
      */
     public function handle(Scalpel $scalpel): int
     {
-        $version = Scalpel::version();
-        $this->newLine();
-        $this->line("  🔬 <fg=cyan;options=bold>Laravel Scalpel</> v{$version} — Baseline Diff");
-        $this->newLine();
+        if (! $this->shouldSuppressBanner()) {
+            $version = Scalpel::version();
+            $this->newLine();
+            $this->line("  🔬 <fg=cyan;options=bold>Laravel Scalpel</> v{$version} — Baseline Diff");
+            $this->newLine();
+        }
 
         $scanner = $scalpel->getScanner('Baseline Diff');
 
@@ -99,6 +102,17 @@ final class ScalpelDiffCommand extends Command
         }
 
         return $findings->hasCriticalOrHigh() ? 1 : 0;
+    }
+
+    /**
+     * Determine if the banner/header should be suppressed.
+     */
+    private function shouldSuppressBanner(): bool
+    {
+        return $this->option('format') === 'json'
+            || ($this->hasOption('no-ansi') && $this->option('no-ansi'))
+            || $this->option('no-banner')
+            || config('scalpel.suppress_banner', false);
     }
 
     /**

@@ -181,4 +181,62 @@ class ScalpelDiffCommandTest extends TestCase
         $this->artisan('scalpel:diff')
             ->assertExitCode(1);
     }
+
+    public function test_diff_command_json_format_suppresses_banner_and_progress(): void
+    {
+        $this->makeTempFile('app.php', '<?php return [];');
+        $this->makeTempFile('.env', 'APP_ENV=testing');
+        $this->createBaselineFromTempDir();
+
+        $exitCode = \Illuminate\Support\Facades\Artisan::call('scalpel:diff', ['--format' => 'json']);
+        $this->assertIsInt($exitCode);
+
+        $output = \Illuminate\Support\Facades\Artisan::output();
+        $this->assertStringNotContainsString('Laravel Scalpel', $output);
+        $this->assertStringNotContainsString('Comparing filesystem', $output);
+        $this->assertStringContainsString('"total"', $output);
+    }
+
+    public function test_diff_command_no_banner_option_suppresses_banner(): void
+    {
+        $this->makeTempFile('app.php', '<?php return [];');
+        $this->makeTempFile('.env', 'APP_ENV=testing');
+        $this->createBaselineFromTempDir();
+
+        $exitCode = \Illuminate\Support\Facades\Artisan::call('scalpel:diff', ['--no-banner' => true]);
+        $this->assertIsInt($exitCode);
+
+        $output = \Illuminate\Support\Facades\Artisan::output();
+        $this->assertStringNotContainsString('Laravel Scalpel', $output);
+        $this->assertStringContainsString('Comparing filesystem', $output);
+    }
+
+    public function test_diff_command_no_ansi_option_suppresses_banner(): void
+    {
+        $this->makeTempFile('app.php', '<?php return [];');
+        $this->makeTempFile('.env', 'APP_ENV=testing');
+        $this->createBaselineFromTempDir();
+
+        $exitCode = \Illuminate\Support\Facades\Artisan::call('scalpel:diff', ['--no-ansi' => true]);
+        $this->assertIsInt($exitCode);
+
+        $output = \Illuminate\Support\Facades\Artisan::output();
+        $this->assertStringNotContainsString('Laravel Scalpel', $output);
+        $this->assertStringContainsString('Comparing filesystem', $output);
+    }
+
+    public function test_diff_command_config_suppress_banner_suppresses_banner(): void
+    {
+        config(['scalpel.suppress_banner' => true]);
+        $this->makeTempFile('app.php', '<?php return [];');
+        $this->makeTempFile('.env', 'APP_ENV=testing');
+        $this->createBaselineFromTempDir();
+
+        $exitCode = \Illuminate\Support\Facades\Artisan::call('scalpel:diff');
+        $this->assertIsInt($exitCode);
+
+        $output = \Illuminate\Support\Facades\Artisan::output();
+        $this->assertStringNotContainsString('Laravel Scalpel', $output);
+        $this->assertStringContainsString('Comparing filesystem', $output);
+    }
 }

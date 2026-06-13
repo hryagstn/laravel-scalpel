@@ -60,4 +60,42 @@ class ScalpelBaselineCommandTest extends TestCase
             ->expectsOutputToContain('Baseline created successfully')
             ->assertExitCode(0);
     }
+
+    public function test_baseline_command_no_banner_option_suppresses_banner(): void
+    {
+        Storage::assertMissing('scalpel/baseline.json');
+
+        $exitCode = \Illuminate\Support\Facades\Artisan::call('scalpel:baseline', ['--no-banner' => true]);
+        $this->assertSame(0, $exitCode);
+
+        $output = \Illuminate\Support\Facades\Artisan::output();
+        $this->assertStringNotContainsString('Laravel Scalpel', $output);
+        $this->assertStringContainsString('Creating baseline snapshot', $output);
+    }
+
+    public function test_baseline_command_no_ansi_option_suppresses_banner(): void
+    {
+        Storage::assertMissing('scalpel/baseline.json');
+
+        $exitCode = \Illuminate\Support\Facades\Artisan::call('scalpel:baseline', ['--no-ansi' => true]);
+        $this->assertSame(0, $exitCode);
+
+        $output = \Illuminate\Support\Facades\Artisan::output();
+        $this->assertStringNotContainsString('Laravel Scalpel', $output);
+        $this->assertStringContainsString('Creating baseline snapshot', $output);
+    }
+
+    public function test_baseline_command_config_suppress_banner_suppresses_banner(): void
+    {
+        config(['scalpel.suppress_banner' => true]);
+        Storage::assertMissing('scalpel/baseline.json');
+
+        $exitCode = \Illuminate\Support\Facades\Artisan::call('scalpel:baseline');
+        $this->assertSame(0, $exitCode);
+
+        $output = \Illuminate\Support\Facades\Artisan::output();
+        $this->assertStringNotContainsString('Laravel Scalpel', $output);
+        $this->assertStringContainsString('Creating baseline snapshot', $output);
+    }
 }
+
