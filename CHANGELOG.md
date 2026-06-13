@@ -5,6 +5,17 @@ All notable changes to `laravel-scalpel` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-06-13
+
+### Added
+- Added `--no-banner` option to `scalpel:scan`, `scalpel:diff`, and `scalpel:baseline` commands to suppress the header banner.
+- Added `scalpel.suppress_banner` configuration option to globally disable the CLI header banner.
+- Added comprehensive feature tests for banner and progress suppression in scan, diff, and baseline commands.
+
+### Changed
+- Automatically suppress the Laravel Scalpel banner when `--format=json` or `--no-ansi` is specified.
+- Automatically suppress the real-time scanning progress bar and related scanner runner console outputs when `--format=json` is specified in `scalpel:scan`.
+
 ## [1.2.0] - 2026-06-12
 
 ### Added
