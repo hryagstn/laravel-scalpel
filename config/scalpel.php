@@ -96,7 +96,6 @@ return [
     'content_scan_excluded_paths' => [
         'vendor',
         'bootstrap/cache',
-        'storage/framework/views',
     ],
 
     /*

@@ -16,6 +16,16 @@ class StructuralAnomalyScanner extends BaseScanner
         return 'Structural Anomaly';
     }
 
+    /**
+     * Laravel framework directories that always contain legitimate PHP files.
+     * These are excluded regardless of user configuration to prevent false positives.
+     *
+     * @var string[]
+     */
+    private const FRAMEWORK_ALLOWED_DIRECTORIES = [
+        'storage/framework/views',
+    ];
+
     public function scan(string $basePath): FindingCollection
     {
         $findings = new FindingCollection();
@@ -27,8 +37,11 @@ class StructuralAnomalyScanner extends BaseScanner
         /** @var string[] $allowedFiles */
         $allowedFiles = config('scalpel.structural_allowed_files', []);
 
-        /** @var string[] $allowedDirectories */
-        $allowedDirectories = config('scalpel.structural_allowed_directories', []);
+        /** @var string[] $configAllowedDirectories */
+        $configAllowedDirectories = config('scalpel.structural_allowed_directories', []);
+
+        // Merge user-configured allowed directories with built-in framework exclusions
+        $allowedDirectories = array_unique(array_merge($configAllowedDirectories, self::FRAMEWORK_ALLOWED_DIRECTORIES));
 
         $excludedPaths = $this->getExcludedPaths();
 

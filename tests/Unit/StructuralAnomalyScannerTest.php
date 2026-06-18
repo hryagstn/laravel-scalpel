@@ -61,4 +61,32 @@ class StructuralAnomalyScannerTest extends TestCase
 
         $this->assertCount(0, $findings);
     }
+
+    public function test_always_excludes_compiled_blade_views(): void
+    {
+        // storage/framework/views contains compiled Blade templates (legitimate PHP files)
+        // These should NEVER be flagged, even if user config doesn't list them
+        @mkdir($this->tempDir . '/storage/framework/views', 0777, true);
+
+        // Create compiled Blade view files (empty and non-empty)
+        file_put_contents($this->tempDir . '/storage/framework/views/abc123.php', '');
+        file_put_contents($this->tempDir . '/storage/framework/views/def456.php', '<?php echo "compiled blade";');
+
+        // Also create a real anomaly elsewhere in storage to make sure scanning still works
+        @mkdir($this->tempDir . '/storage/app', 0777, true);
+        file_put_contents($this->tempDir . '/storage/app/backdoor.php', '<?php eval("bad");');
+
+        $scanner = new StructuralAnomalyScanner();
+        $findings = $scanner->scan($this->tempDir);
+
+        $files = array_map(fn ($f) => $f->file, $findings->all());
+
+        // Compiled Blade views should NOT be flagged
+        $this->assertNotContains('storage/framework/views/abc123.php', $files);
+        $this->assertNotContains('storage/framework/views/def456.php', $files);
+
+        // But real anomalies in storage should still be flagged
+        $this->assertContains('storage/app/backdoor.php', $files);
+        $this->assertCount(1, $findings);
+    }
 }
