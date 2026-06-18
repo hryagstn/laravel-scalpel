@@ -5,7 +5,7 @@ All notable changes to `laravel-scalpel` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.3.2] - 2026-06-18
+## [1.3.3] - 2026-06-18
 
 ### Fixed
 - Fixed `StructuralAnomalyScanner` false positives for Laravel framework directories (`storage/framework/views/` and `storage/framework/cache/`). These directories contain legitimate auto-generated PHP files (compiled Blade templates and real-time facade caches). They are now recognized as built-in framework directories, while `ObfuscatedCodeScanner` continues to scan them for actual obfuscated code.
