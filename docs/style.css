@@ -1193,7 +1193,7 @@ ul {
 
 @media (min-width: 768px) {
     .footer-container {
-        grid-template-columns: 1.5fr repeat(2, 1fr);
+        grid-template-columns: 1.5fr 2fr;
     }
 }
 
@@ -1226,6 +1226,19 @@ ul {
 .footer-tagline {
     font-size: 0.875rem;
     color: var(--clr-text-muted);
+}
+
+.footer-links {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 2rem;
+}
+
+@media (max-width: 640px) {
+    .footer-links {
+        grid-template-columns: 1fr;
+        gap: 2rem;
+    }
 }
 
 .footer-links h4 {
