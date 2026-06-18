@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- SEO Meta Tags -->
+    <title>Laravel Scalpel - Intrusion Evidence Scanner for Laravel</title>
+    <meta name="description" content="A zero-dependency, filesystem-level forensic scanner that detects backdoors, rogue PHP files, tampered .htaccess directives, and unauthorized file modifications in your Laravel applications.">
+    <meta name="keywords" content="laravel, security, scanner, forensics, php, backdoor, detection, htaccess, env integrity, baseline diff">
+    <meta name="author" content="Harry Agustiana">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Laravel Scalpel - Intrusion Evidence Scanner">
+    <meta property="og:description" content="Forensic filesystem auditing tool for Laravel applications. Find backdoors and filesystem tampering instantly.">
+    <meta property="og:image" content="logo.png">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:title" content="Laravel Scalpel - Intrusion Evidence Scanner">
+    <meta property="twitter:description" content="Forensic filesystem auditing tool for Laravel applications. Find backdoors and filesystem tampering instantly.">
+    <meta property="twitter:image" content="logo.png">
+
+    <!-- Typography & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Custom Stylesheet -->
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="logo.png">
+</head>
+<body>
+
+    <!-- Header Navigation -->
+    <header id="main-header" class="site-header">
+        <div class="container header-container">
+            <a href="#" class="logo-wrapper">
+                <img src="logo.png" alt="Laravel Scalpel Logo" class="header-logo">
+                <span class="logo-text">Laravel <span class="accent-text">Scalpel</span></span>
+                <span class="badge-version">v1.0.0</span>
+            </a>
+            
+            <nav class="main-nav" aria-label="Main Navigation">
+                <ul>
+                    <li><a href="#threat-model">Why Scalpel?</a></li>
+                    <li><a href="#scanners">Scanners</a></li>
+                    <li><a href="#config-reference">Configuration</a></li>
+                    <li><a href="#quick-start">Quick Start</a></li>
+                    <li class="dropdown">
+                        <a href="#other-tools" class="dropdown-trigger">Other Tools <span class="chevron-icon">▼</span></a>
+                        <ul class="dropdown-menu">
+                            <li><a href="https://github.com/hryagstn/n8n-bastion" target="_blank" rel="noopener">n8n-bastion</a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </nav>
+
+            <div class="header-actions">
+                <a href="https://github.com/hryagstn/laravel-scalpel" target="_blank" rel="noopener" class="btn btn-outline btn-sm github-btn" id="nav-github-link">
+                    <svg viewBox="0 0 24 24" class="svg-icon" width="18" height="18" fill="currentColor">
+                        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                    </svg>
+                    <span>View on GitHub</span>
+                </a>
+            </div>
+            
+            <!-- Mobile Menu Toggle -->
+            <button class="mobile-menu-toggle" aria-label="Toggle navigation menu" id="mobile-menu-btn">
+                <span class="bar"></span>
+                <span class="bar"></span>
+                <span class="bar"></span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Mobile Nav Overlay -->
+    <div class="mobile-nav-overlay" id="mobile-nav">
+        <nav class="mobile-nav-menu">
+            <ul>
+                <li><a href="#threat-model">Why Scalpel?</a></li>
+                <li><a href="#scanners">Scanners</a></li>
+                <li><a href="#config-reference">Configuration</a></li>
+                <li><a href="#quick-start">Quick Start</a></li>
+                <li><a href="https://github.com/hryagstn/n8n-bastion" target="_blank" rel="noopener">n8n-bastion</a></li>
+                <li><a href="https://github.com/hryagstn/laravel-scalpel" target="_blank" rel="noopener" class="btn btn-primary btn-sm">GitHub</a></li>
+            </ul>
+        </nav>
+    </div>
+
+    <!-- Hero Section -->
+    <section class="hero-section">
+        <div class="glow-bg glow-primary"></div>
+        <div class="glow-bg glow-secondary"></div>
+        <div class="container hero-container">
+            <div class="hero-content">
+                <div class="hero-badge">
+                    <span class="badge-icon">🔪</span>
+                    <span class="badge-text">Filesystem-Level Forensic Security for Laravel</span>
+                </div>
+                <h1 class="hero-title">
+                    Detect compromised files, backdoors, and filesystem anomalies <span class="gradient-text">instantly</span>.
+                </h1>
+                <p class="hero-lead">
+                    A zero-dependency, filesystem-level forensic scanner that monitors your Laravel codebase. Find hidden webshells, tampered configuration, and unexpected PHP payloads before they impact your users.
+                </p>
+                <div class="hero-buttons">
+                    <a href="#quick-start" class="btn btn-primary btn-lg">
+                        <span>Get Started</span>
+                        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" class="btn-arrow"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                    </a>
+                    <a href="https://github.com/hryagstn/laravel-scalpel" target="_blank" rel="noopener" class="btn btn-secondary btn-lg">
+                        <svg viewBox="0 0 24 24" class="svg-icon" width="20" height="20" fill="currentColor">
+                            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                        </svg>
+                        <span>GitHub Repository</span>
+                    </a>
+                </div>
+            </div>
+            
+            <!-- Terminal Simulator Mockup -->
+            <div class="terminal-mockup-wrapper">
+                <div class="terminal-container">
+                    <div class="terminal-header">
+                        <div class="terminal-dots">
+                            <span class="dot dot-red"></span>
+                            <span class="dot dot-yellow"></span>
+                            <span class="dot dot-green"></span>
+                        </div>
+                        <div class="terminal-title">Artisan Console - laravel-scalpel</div>
+                        <div class="terminal-actions">
+                            <span class="terminal-os-badge">bash</span>
+                        </div>
+                    </div>
+                    <div class="terminal-tabs" role="tablist">
+                        <button class="terminal-tab-btn active" id="btn-tab-scan" role="tab" aria-selected="true">php artisan scalpel:scan</button>
+                        <button class="terminal-tab-btn" id="btn-tab-baseline" role="tab" aria-selected="false">php artisan scalpel:baseline</button>
+                        <button class="terminal-tab-btn" id="btn-tab-diff" role="tab" aria-selected="false">php artisan scalpel:diff</button>
+                    </div>
+                    <div class="terminal-body" id="terminal-content">
+                        <!-- Content will be dynamically inserted here via app.js -->
+                    </div>
+                </div>
+                <div class="terminal-controls">
+                    <button class="control-btn" id="btn-run-terminal">
+                        <span class="play-icon">▶</span> Run Command
+                    </button>
+                    <span class="control-help">Click to replay the simulated execution.</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- The Threat Model / Problem Section -->
+    <section id="threat-model" class="threat-section">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-subtitle">THE THREAT MODEL</span>
+                <h2 class="section-title">Why configuration audits aren't enough</h2>
+                <p class="section-lead">
+                    Static analysis tools audit your code configuration for vulnerability paths, but what happens when an attacker successfully bypasses your filters and uploads a backdoor?
+                </p>
+            </div>
+            
+            <div class="threat-grid">
+                <div class="threat-card card-alert">
+                    <div class="threat-card-icon">⚡</div>
+                    <h3>The Silent Intrusion</h3>
+                    <p>
+                        Attackers quietly drop obfuscated PHP webshells inside public assets directories or storage zones (e.g. <code>public/icons/avatar.php</code>) disguised as generic assets. Traditional WAFs and error trackers miss them because they don't throw application exceptions.
+                    </p>
+                </div>
+                
+                <div class="threat-card card-alert">
+                    <div class="threat-card-icon">⚙️</div>
+                    <h3>Configuration Hijacking</h3>
+                    <p>
+                        By altering root or directory <code>.htaccess</code> rules, intruders can force servers to map Python or Perl interpreters to custom MIME types, enabling them to execute raw terminal scripts via normal HTTP requests.
+                    </p>
+                </div>
+                
+                <div class="threat-card card-alert">
+                    <div class="threat-card-icon">🔐</div>
+                    <h3>Log Clearing & Silencing</h3>
+                    <p>
+                        Malicious actors routinely delete or truncate your application's <code>.env</code> configurations. This silences monitoring endpoints, disables error-log tracking libraries, and resets security keys, blinding your incident response.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Before/After Forensic Logic -->
+            <div class="forensic-contrast">
+                <div class="contrast-panel before-panel">
+                    <div class="panel-header text-red">❌ Traditional Firewalls / WAFs</div>
+                    <ul>
+                        <li>Only scan incoming HTTP request payload strings.</li>
+                        <li>Do not audit the local directory layout.</li>
+                        <li>Unaware of newly written backdoors running on disk.</li>
+                        <li>Blind to configuration files like <code>.env</code> disappearing.</li>
+                    </ul>
+                </div>
+                <div class="contrast-panel after-panel">
+                    <div class="panel-header text-green">✨ The Laravel Scalpel Way</div>
+                    <ul>
+                        <li>Scans local folders directly for rogue PHP code in non-PHP zones.</li>
+                        <li>Identifies dangerous handler directives inside <code>.htaccess</code>.</li>
+                        <li>Verifies <code>.env</code> structural state and readability.</li>
+                        <li>Performs cryptographic baseline checks to catch any modified file.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Core Scanners (Grid Panel) -->
+    <section id="scanners" class="scanners-section">
+        <div class="glow-bg glow-scanners"></div>
+        <div class="container">
+            <div class="section-header">
+                <span class="section-subtitle">DETECTION ENGINE</span>
+                <h2 class="section-title">Five Specialized Forensic Scanners</h2>
+                <p class="section-lead">
+                    Laravel Scalpel divides its work into individual checkers, each focusing on a distinct indicator of system compromise.
+                </p>
+            </div>
+            
+            <div class="scanners-grid">
+                <!-- Scanner 1 -->
+                <div class="scanner-card">
+                    <div class="scanner-icon-wrapper">
+                        <!-- Structural SVG -->
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                            <polyline points="2 17 12 22 22 17"></polyline>
+                            <polyline points="2 12 12 17 22 12"></polyline>
+                        </svg>
+                    </div>
+                    <h3>Structural Anomaly Scanner</h3>
+                    <p>
+                        Flags PHP script extensions hidden inside static zones like <code>public/</code>, <code>storage/</code>, and <code>bootstrap/cache/</code>.
+                    </p>
+                    <ul class="scanner-details">
+                        <li>Configurable list of <code>non_php_zones</code></li>
+                        <li>Custom file whitelist (e.g. <code>index.php</code>)</li>
+                        <li>Automatic path resolution for framework vendors</li>
+                    </ul>
+                </div>
+                
+                <!-- Scanner 2 -->
+                <div class="scanner-card">
+                    <div class="scanner-icon-wrapper">
+                        <!-- Obfuscation SVG -->
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+                            <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+                            <line x1="6" y1="6" x2="6.01" y2="6"></line>
+                            <line x1="6" y1="18" x2="6.01" y2="18"></line>
+                        </svg>
+                    </div>
+                    <h3>Obfuscated Code Scanner</h3>
+                    <p>
+                        Deconstructs all project PHP sources to identify obfuscated payloads, webshell triggers, and base64 payloads.
+                    </p>
+                    <ul class="scanner-details">
+                        <li>Detects <code>eval(base64_decode)</code>, <code>gzinflate</code></li>
+                        <li>Flags dynamic assertions & variable functions</li>
+                        <li>Flags suspiciously long base64 strings (>=500 chars)</li>
+                    </ul>
+                </div>
+                
+                <!-- Scanner 3 -->
+                <div class="scanner-card">
+                    <div class="scanner-icon-wrapper">
+                        <!-- htaccess SVG -->
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                        </svg>
+                    </div>
+                    <h3>htaccess Directive Scanner</h3>
+                    <p>
+                        Audits Apache configurations for injected rules changing handler maps to trigger external scripts (Python, Perl).
+                    </p>
+                    <ul class="scanner-details">
+                        <li>Flags unauthorized <code>AddHandler</code> triggers</li>
+                        <li>Flags server side script hooks inside directories</li>
+                        <li>Finds customized CGI interpreter bindings</li>
+                    </ul>
+                </div>
+                
+                <!-- Scanner 4 -->
+                <div class="scanner-card">
+                    <div class="scanner-icon-wrapper">
+                        <!-- Baseline Diff SVG -->
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                        </svg>
+                    </div>
+                    <h3>Baseline Diff Scanner</h3>
+                    <p>
+                        Calculates cryptographic checksum hashes for codebases. Instantly reveals files that were altered, deleted, or injected.
+                    </p>
+                    <ul class="scanner-details">
+                        <li>Generates <code>baseline.json</code> snapshots</li>
+                        <li>Excludes dynamic paths (logs, caching views)</li>
+                        <li>Ideal tool for post-deployment checks</li>
+                    </ul>
+                </div>
+                
+                <!-- Scanner 5 -->
+                <div class="scanner-card">
+                    <div class="scanner-icon-wrapper">
+                        <!-- Env Integrity SVG -->
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="16" y1="13" x2="8" y2="13"></line>
+                            <line x1="16" y1="17" x2="8" y2="17"></line>
+                            <polyline points="10 9 9 9 8 9"></polyline>
+                        </svg>
+                    </div>
+                    <h3>Env Integrity Scanner</h3>
+                    <p>
+                        Validates the local state of critical variables, guarding configuration blocks against deletion or tampering.
+                    </p>
+                    <ul class="scanner-details">
+                        <li>Checks file existence & write access</li>
+                        <li>Detects complete env file deletion/truncation</li>
+                        <li>Flags empty env blocks blocking logging engines</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Configuration Tabbed Reference Section -->
+    <section id="config-reference" class="config-section">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-subtitle">CONFIGURATION & WORKFLOWS</span>
+                <h2 class="section-title">Highly Customizable Security Settings</h2>
+                <p class="section-lead">
+                    Manage rules, adjust obfuscation filters, declare safe directories, and trigger alerts through modern integrations.
+                </p>
+            </div>
+            
+            <div class="code-tabs-container">
+                <div class="code-tabs-sidebar">
+                    <button class="code-tab-btn active" data-target="tab-code-config">
+                        <span class="tab-label">config/scalpel.php</span>
+                        <span class="tab-desc">Package configuration</span>
+                    </button>
+                    <button class="code-tab-btn" data-target="tab-code-ci">
+                        <span class="tab-label">github-actions.yml</span>
+                        <span class="tab-desc">CI/CD security gate</span>
+                    </button>
+                    <button class="code-tab-btn" data-target="tab-code-n8n">
+                        <span class="tab-label">n8n Bastion Alert</span>
+                        <span class="tab-desc">Real-time alerts via Telegram</span>
+                    </button>
+                </div>
+                
+                <div class="code-panels-wrapper">
+                    <!-- Tab Panel 1: Configuration -->
+                    <div class="code-panel active" id="tab-code-config">
+                        <div class="panel-meta">
+                            <span class="file-path">config/scalpel.php</span>
+                            <button class="btn-copy-code" data-clipboard="code-config-content">Copy Config</button>
+                        </div>
+                        <pre class="code-block" id="code-config-content"><code><span class="keyword">&lt;?php</span>
+
+<span class="keyword">return</span> [
+    <span class="comment">// Directories where PHP files should not exist</span>
+    <span class="string">'non_php_zones'</span> => [
+        <span class="string">'public'</span>,
+        <span class="string">'storage'</span>,
+        <span class="string">'bootstrap/cache'</span>,
+    ],
+
+    <span class="comment">// Whitelisted PHP files within static directories</span>
+    <span class="string">'structural_allowed_files'</span> => [
+        <span class="string">'public/index.php'</span>,
+    ],
+
+    <span class="comment">// Excluded from ALL scans</span>
+    <span class="string">'excluded_paths'</span> => [
+        <span class="string">'vendor'</span>,
+        <span class="string">'node_modules'</span>,
+        <span class="string">'.git'</span>,
+    ],
+
+    <span class="comment">// Target obfuscation regex checks</span>
+    <span class="string">'obfuscation_patterns'</span> => [
+        <span class="string">'eval_base64_decode'</span>  => <span class="constant">true</span>,
+        <span class="string">'eval_gzinflate'</span>      => <span class="constant">true</span>,
+        <span class="string">'eval_str_rot13'</span>      => <span class="constant">true</span>,
+        <span class="string">'eval_gzuncompress'</span>   => <span class="constant">true</span>,
+        <span class="string">'assert_dynamic'</span>      => <span class="constant">true</span>,
+        <span class="string">'long_encoded_string'</span> => <span class="constant">true</span>,
+    ],
+
+    <span class="string">'long_string_threshold'</span> => <span class="number">500</span>,
+    <span class="string">'severity_threshold'</span> => <span class="string">'LOW'</span>,
+];</code></pre>
+                    </div>
+
+                    <!-- Tab Panel 2: CI/CD -->
+                    <div class="code-panel" id="tab-code-ci">
+                        <div class="panel-meta">
+                            <span class="file-path">.github/workflows/security.yml</span>
+                            <button class="btn-copy-code" data-clipboard="code-ci-content">Copy YAML</button>
+                        </div>
+                        <pre class="code-block" id="code-ci-content"><code><span class="keyword">name</span>: Security Scan
+
+<span class="keyword">on</span>:
+  <span class="keyword">push</span>:
+    <span class="keyword">branches</span>: [main]
+  <span class="keyword">schedule</span>:
+    - <span class="keyword">cron</span>: <span class="string">'0 6 * * *'</span> <span class="comment"># Daily at 6 AM UTC</span>
+
+<span class="keyword">jobs</span>:
+  <span class="keyword">scalpel-scan</span>:
+    <span class="keyword">runs-on</span>: ubuntu-latest
+    <span class="keyword">steps</span>:
+      - <span class="keyword">uses</span>: actions/checkout@v4
+
+      - <span class="keyword">name</span>: Setup PHP
+        <span class="keyword">uses</span>: shivammathur/setup-php@v2
+        <span class="keyword">with</span>:
+          <span class="keyword">php-version</span>: <span class="string">'8.2'</span>
+
+      - <span class="keyword">name</span>: Install Dependencies
+        <span class="keyword">run</span>: composer install --no-interaction --prefer-dist
+
+      - <span class="keyword">name</span>: Run Scalpel Scan
+        <span class="keyword">run</span>: php artisan scalpel:scan --format=json
+
+      - <span class="keyword">name</span>: Run Baseline Diff
+        <span class="keyword">run</span>: php artisan scalpel:diff --format=json</code></pre>
+                    </div>
+
+                    <!-- Tab Panel 3: n8n Integration -->
+                    <div class="code-panel" id="tab-code-n8n">
+                        <div class="panel-meta">
+                            <span class="file-path">Integrate with n8n-bastion</span>
+                            <button class="btn-copy-code" data-clipboard="code-n8n-content">Copy Script</button>
+                        </div>
+                        <pre class="code-block" id="code-n8n-content"><code><span class="comment"># Pair laravel-scalpel with n8n-bastion to receive instant Telegram notifications</span>
+<span class="comment"># when a CRITICAL vulnerability or filesystem alteration occurs on your production VPS.</span>
+
+<span class="comment"># Example bash hook triggered by cron on your VPS server:</span>
+RESULT=$(php artisan scalpel:scan --format=json)
+EXIT_CODE=$?
+
+<span class="keyword">if</span> [ $EXIT_CODE -ne 0 ]; <span class="keyword">then</span>
+    <span class="comment"># Send payload to n8n webhook</span>
+    curl -X POST https://your-n8n-bastion-domain.com/webhook/scalpel-alert \
+      -H <span class="string">"Content-Type: application/json"</span> \
+      -d <span class="string">"{\"status\": \"compromised\", \"findings\": $RESULT}"</span>
+<span class="keyword">fi</span></code></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Installation & Quick Start -->
+    <section id="quick-start" class="installation-section">
+        <div class="glow-bg glow-install"></div>
+        <div class="container">
+            <div class="section-header">
+                <span class="section-subtitle">INSTALLATION</span>
+                <h2 class="section-title">Get Started in 3 Simple Steps</h2>
+                <p class="section-lead">
+                    Integrate Laravel Scalpel into your codebase in less than a minute.
+                </p>
+            </div>
+            
+            <div class="installation-steps">
+                <!-- Step 1 -->
+                <div class="step-card">
+                    <div class="step-number">1</div>
+                    <div class="step-details">
+                        <h3>Install Package</h3>
+                        <p>Pull the scanner package into your project vendor using Composer.</p>
+                        <div class="code-input-wrapper">
+                            <code>composer require hryagstn/laravel-scalpel</code>
+                            <button class="btn-copy-input" data-copy="composer require hryagstn/laravel-scalpel" aria-label="Copy composer command">Copy</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Step 2 -->
+                <div class="step-card">
+                    <div class="step-number">2</div>
+                    <div class="step-details">
+                        <h3>Publish Configuration</h3>
+                        <p>Generate your config asset template file <code>config/scalpel.php</code>.</p>
+                        <div class="code-input-wrapper">
+                            <code>php artisan vendor:publish --tag=scalpel-config</code>
+                            <button class="btn-copy-input" data-copy="php artisan vendor:publish --tag=scalpel-config" aria-label="Copy publish command">Copy</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Step 3 -->
+                <div class="step-card">
+                    <div class="step-number">3</div>
+                    <div class="step-details">
+                        <h3>Run The Scanner</h3>
+                        <p>Audit your directories or create baseline snapshots of your codebase.</p>
+                        <div class="code-input-wrapper">
+                            <code>php artisan scalpel:scan</code>
+                            <button class="btn-copy-input" data-copy="php artisan scalpel:scan" aria-label="Copy scan command">Copy</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Other Tools Section -->
+    <section id="other-tools" class="other-tools-section">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-subtitle">ECOSYSTEM COMPANIONS</span>
+                <h2 class="section-title">Extend Your Surveillance System</h2>
+                <p class="section-lead">
+                    Combine filesystem scans with other open-source tooling from the same developer for maximum visibility.
+                </p>
+            </div>
+            
+            <div class="ecosystem-container">
+                <div class="ecosystem-card">
+                    <div class="eco-badge">RECOMMENDED PAIRING</div>
+                    <h3>n8n-bastion</h3>
+                    <p>
+                        A self-hosted open-source server security monitor template designed for VPS administrators. Combined with Laravel Scalpel, it watches server performance metrics, process counts, and forwards urgent security threat updates directly to your Telegram chat.
+                    </p>
+                    <div class="eco-actions">
+                        <a href="https://github.com/hryagstn/n8n-bastion" target="_blank" rel="noopener" class="btn btn-primary btn-sm">
+                            <span>Explore n8n-bastion</span>
+                            <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="site-footer">
+        <div class="container footer-container">
+            <div class="footer-brand">
+                <div class="footer-logo-wrap">
+                    <img src="logo.png" alt="Laravel Scalpel Logo" class="footer-logo">
+                    <span class="footer-title">Laravel Scalpel</span>
+                </div>
+                <p class="footer-tagline">Intrusion Evidence Scanner for Laravel.</p>
+            </div>
+            
+            <div class="footer-links">
+                <div class="link-group">
+                    <h4>Links</h4>
+                    <ul>
+                        <li><a href="https://github.com/hryagstn/laravel-scalpel" target="_blank" rel="noopener">GitHub</a></li>
+                        <li><a href="https://packagist.org/packages/hryagstn/laravel-scalpel" target="_blank" rel="noopener">Packagist</a></li>
+                        <li><a href="https://github.com/hryagstn/laravel-scalpel/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Changelog</a></li>
+                    </ul>
+                </div>
+                <div class="link-group">
+                    <h4>Ecosystem</h4>
+                    <ul>
+                        <li><a href="https://github.com/hryagstn/n8n-bastion" target="_blank" rel="noopener">n8n-bastion</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer-bottom">
+            <div class="container footer-bottom-container">
+                <p class="copyright">&copy; 2026. Created by <a href="https://github.com/hryagstn" target="_blank" rel="noopener">Harry Agustiana</a>. Code licensed under MIT.</p>
+                <div class="laravel-disclaimer">This package is an independent community project and is not affiliated with or endorsed by Taylor Otwell or Laravel LLC.</div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Clipboard feedback tooltip -->
+    <div id="copy-tooltip" class="copy-tooltip">Copied!</div>
+
+    <!-- Interactive script -->
+    <script src="app.js"></script>
+</body>
+</html>
