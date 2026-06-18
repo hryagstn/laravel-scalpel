@@ -35,7 +35,7 @@ final class ScalpelDiffCommand extends Command
     public function handle(Scalpel $scalpel): int
     {
         if (! $this->shouldSuppressBanner()) {
-            $version = Scalpel::version();
+            $version = ltrim(Scalpel::version(), 'v');
             $this->newLine();
             $this->line("  🔬 <fg=cyan;options=bold>Laravel Scalpel</> v{$version} — Baseline Diff");
             $this->newLine();

@@ -49,6 +49,7 @@ return [
 
     'structural_allowed_directories' => [
         'public/vendor',
+        'storage/framework/views',
     ],
 
     /*
@@ -95,6 +96,7 @@ return [
     'content_scan_excluded_paths' => [
         'vendor',
         'bootstrap/cache',
+        'storage/framework/views',
     ],
 
     /*

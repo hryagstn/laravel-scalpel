@@ -32,7 +32,7 @@ final class ScalpelBaselineCommand extends Command
     public function handle(Scalpel $scalpel): int
     {
         if (! $this->shouldSuppressBanner()) {
-            $version = Scalpel::version();
+            $version = ltrim(Scalpel::version(), 'v');
             $this->newLine();
             $this->line("  🔬 <fg=cyan;options=bold>Laravel Scalpel</> v{$version} — Baseline Snapshot");
             $this->newLine();
