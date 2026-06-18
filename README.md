@@ -2,7 +2,7 @@
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/hryagstn/laravel-scalpel.svg?style=flat-square)](https://packagist.org/packages/hryagstn/laravel-scalpel)
 [![PHP Version](https://img.shields.io/packagist/php-v/hryagstn/laravel-scalpel?style=flat-square)](https://packagist.org/packages/hryagstn/laravel-scalpel)
 [![Laravel Version](https://img.shields.io/badge/laravel-10.x%20|%2011.x%20|%2012.x%20|%2013.x-blue?style=flat-square)](https://packagist.org/packages/hryagstn/laravel-scalpel)
-[![Website](https://img.shields.io/badge/website-laravel--scalpel.github.io-coral?style=flat-square)](https://laravel-scalpel.github.io)
+[![Website](https://img.shields.io/badge/website-hryagstn.github.io%2Flaravel--scalpel-coral?style=flat-square)](https://hryagstn.github.io/laravel-scalpel/)
 [![License](https://img.shields.io/packagist/l/hryagstn/laravel-scalpel?style=flat-square)](LICENSE)
 
 # 🔪 laravel-scalpel
@@ -11,7 +11,7 @@
 
 A zero-dependency, filesystem-level forensic scanner that detects signs of compromise in your Laravel application — obfuscated backdoors, rogue PHP files, tampered `.htaccess` directives, missing `.env` files, and unexpected filesystem changes.
 
-Interactive landing page and simulator: **[laravel-scalpel.github.io](https://laravel-scalpel.github.io)**
+Interactive landing page and simulator: **[hryagstn.github.io/laravel-scalpel](https://hryagstn.github.io/laravel-scalpel/)**
 
 ---
 
