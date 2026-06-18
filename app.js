@@ -300,4 +300,25 @@ document.addEventListener('DOMContentLoaded', () => {
             card.style.setProperty('--y', `${y}px`);
         });
     });
+
+    // -------------------------------------------------------------
+    // 6. Dynamic Version Tag Fetcher
+    // -------------------------------------------------------------
+    async function fetchLatestVersion() {
+        try {
+            const response = await fetch('https://api.github.com/repos/hryagstn/laravel-scalpel/tags');
+            if (response.ok) {
+                const tags = await response.json();
+                if (tags && tags.length > 0 && tags[0].name) {
+                    const latestVersion = tags[0].name;
+                    document.querySelectorAll('.badge-version').forEach(el => {
+                        el.textContent = latestVersion;
+                    });
+                }
+            }
+        } catch (error) {
+            console.warn('Failed to fetch latest release version from GitHub:', error);
+        }
+    }
+    fetchLatestVersion();
 });
