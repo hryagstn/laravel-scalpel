@@ -62,15 +62,33 @@ class StructuralAnomalyScannerTest extends TestCase
         $this->assertCount(0, $findings);
     }
 
-    public function test_always_excludes_compiled_blade_views(): void
+    public function test_always_excludes_laravel_framework_directories(): void
     {
         // storage/framework/views contains compiled Blade templates (legitimate PHP files)
+        // storage/framework/cache contains real-time facade cache files (legitimate PHP files)
         // These should NEVER be flagged, even if user config doesn't list them
         @mkdir($this->tempDir . '/storage/framework/views', 0777, true);
+        @mkdir($this->tempDir . '/storage/framework/cache', 0777, true);
 
         // Create compiled Blade view files (empty and non-empty)
         file_put_contents($this->tempDir . '/storage/framework/views/abc123.php', '');
         file_put_contents($this->tempDir . '/storage/framework/views/def456.php', '<?php echo "compiled blade";');
+
+        // Create real-time facade cache files
+        file_put_contents($this->tempDir . '/storage/framework/cache/facade-1e06026dbe325cba543b.php', '<?php
+
+namespace Facades\App\Services;
+
+use Illuminate\Support\Facades\Facade;
+
+class MyService extends Facade
+{
+    protected static function getFacadeAccessor(): string
+    {
+        return \'App\Services\MyService\';
+    }
+}
+');
 
         // Also create a real anomaly elsewhere in storage to make sure scanning still works
         @mkdir($this->tempDir . '/storage/app', 0777, true);
@@ -84,6 +102,9 @@ class StructuralAnomalyScannerTest extends TestCase
         // Compiled Blade views should NOT be flagged
         $this->assertNotContains('storage/framework/views/abc123.php', $files);
         $this->assertNotContains('storage/framework/views/def456.php', $files);
+
+        // Real-time facade caches should NOT be flagged
+        $this->assertNotContains('storage/framework/cache/facade-1e06026dbe325cba543b.php', $files);
 
         // But real anomalies in storage should still be flagged
         $this->assertContains('storage/app/backdoor.php', $files);

@@ -24,6 +24,7 @@ class StructuralAnomalyScanner extends BaseScanner
      */
     private const FRAMEWORK_ALLOWED_DIRECTORIES = [
         'storage/framework/views',
+        'storage/framework/cache',
     ];
 
     public function scan(string $basePath): FindingCollection

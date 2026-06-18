@@ -50,6 +50,7 @@ return [
     'structural_allowed_directories' => [
         'public/vendor',
         'storage/framework/views',
+        'storage/framework/cache',
     ],
 
     /*

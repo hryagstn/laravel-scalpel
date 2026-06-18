@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.3.2] - 2026-06-18
 
 ### Fixed
-- Fixed `StructuralAnomalyScanner` false positive for compiled Blade templates in `storage/framework/views/`. PHP files in this directory are now always recognized as legitimate framework files (built-in exclusion), while `ObfuscatedCodeScanner` continues to scan them for actual obfuscated code.
+- Fixed `StructuralAnomalyScanner` false positives for Laravel framework directories (`storage/framework/views/` and `storage/framework/cache/`). These directories contain legitimate auto-generated PHP files (compiled Blade templates and real-time facade caches). They are now recognized as built-in framework directories, while `ObfuscatedCodeScanner` continues to scan them for actual obfuscated code.
 
 ## [1.3.1] - 2026-06-18
 
