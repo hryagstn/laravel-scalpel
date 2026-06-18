@@ -5,6 +5,12 @@ All notable changes to `laravel-scalpel` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2026-06-18
+
+### Fixed
+- Fixed double "v" prefix in CLI version display (e.g., `vv1.3.0` → `v1.3.0`) across all commands (scan, baseline, diff).
+- Fixed false positive HIGH findings for compiled Blade templates in `storage/framework/views/` by adding the directory to `structural_allowed_directories` and `content_scan_excluded_paths`.
+
 ## [1.3.0] - 2026-06-13
 
 ### Added
