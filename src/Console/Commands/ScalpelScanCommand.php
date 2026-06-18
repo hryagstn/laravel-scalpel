@@ -84,7 +84,7 @@ final class ScalpelScanCommand extends Command
      */
     private function displayBanner(): void
     {
-        $version = Scalpel::version();
+        $version = ltrim(Scalpel::version(), 'v');
         $this->newLine();
         $this->line('  ╔══════════════════════════════════════════════════╗');
         $this->line($this->formatBoxLine('  🔬 <fg=cyan;options=bold>Laravel Scalpel</> — Intrusion Evidence Scanner  '));
