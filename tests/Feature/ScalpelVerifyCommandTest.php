@@ -65,6 +65,9 @@ class ScalpelVerifyCommandTest extends TestCase
         config(['scalpel.signing.enabled' => false]);
 
         $exitCode = Artisan::call('scalpel:scan', ['--format' => 'json']);
+        if ($exitCode !== 0) {
+            throw new \Exception("Exit code was {$exitCode}. Scan output: " . Artisan::output());
+        }
         $this->assertSame(0, $exitCode);
 
         $output = Artisan::output();
@@ -91,6 +94,9 @@ class ScalpelVerifyCommandTest extends TestCase
         ]);
 
         $exitCode = Artisan::call('scalpel:scan', ['--format' => 'json']);
+        if ($exitCode !== 0) {
+            throw new \Exception("Exit code was {$exitCode}. Scan output: " . Artisan::output());
+        }
         $this->assertSame(0, $exitCode);
 
         $output = Artisan::output();
