@@ -11,7 +11,7 @@
 <p align="center">
   <a href="https://github.com/hryagstn/laravel-scalpel/actions"><img src="https://img.shields.io/github/actions/workflow/status/hryagstn/laravel-scalpel/tests.yml?branch=main&style=flat-square" alt="Build Status"></a>
   <a href="https://packagist.org/packages/hryagstn/laravel-scalpel"><img src="https://img.shields.io/packagist/v/hryagstn/laravel-scalpel.svg?style=flat-square" alt="Latest Version on Packagist"></a>
-  <a href="https://packagist.org/packages/hryagstn/laravel-scalpel"><img src="https://img.shields.io/php-v/hryagstn/laravel-scalpel?style=flat-square" alt="PHP Version"></a>
+  <a href="https://packagist.org/packages/hryagstn/laravel-scalpel"><img src="https://img.shields.io/packagist/php-v/hryagstn/laravel-scalpel?style=flat-square" alt="PHP Version"></a>
   <a href="https://packagist.org/packages/hryagstn/laravel-scalpel"><img src="https://img.shields.io/badge/laravel-10.x%20|%2011.x%20|%2012.x%20|%2013.x-blue?style=flat-square" alt="Laravel Version"></a>
   <a href="https://hryagstn.github.io/laravel-scalpel/"><img src="https://img.shields.io/badge/website-hryagstn.github.io%2Flaravel--scalpel-coral?style=flat-square" alt="Website"></a>
   <a href="LICENSE"><img src="https://img.shields.io/packagist/l/hryagstn/laravel-scalpel?style=flat-square" alt="License"></a>
