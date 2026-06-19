@@ -7,6 +7,7 @@ namespace Hryagstn\Scalpel;
 use Hryagstn\Scalpel\Console\Commands\ScalpelBaselineCommand;
 use Hryagstn\Scalpel\Console\Commands\ScalpelDiffCommand;
 use Hryagstn\Scalpel\Console\Commands\ScalpelScanCommand;
+use Hryagstn\Scalpel\Console\Commands\ScalpelVerifyCommand;
 use Illuminate\Support\ServiceProvider;
 
 final class ScalpelServiceProvider extends ServiceProvider
@@ -40,6 +41,7 @@ final class ScalpelServiceProvider extends ServiceProvider
                 ScalpelScanCommand::class,
                 ScalpelBaselineCommand::class,
                 ScalpelDiffCommand::class,
+                ScalpelVerifyCommand::class,
             ]);
         }
     }

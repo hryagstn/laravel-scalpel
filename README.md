@@ -1,13 +1,21 @@
-[![Build Status](https://img.shields.io/github/actions/workflow/status/hryagstn/laravel-scalpel/tests.yml?branch=main&style=flat-square)](https://github.com/hryagstn/laravel-scalpel/actions)
-[![Latest Version on Packagist](https://img.shields.io/packagist/v/hryagstn/laravel-scalpel.svg?style=flat-square)](https://packagist.org/packages/hryagstn/laravel-scalpel)
-[![PHP Version](https://img.shields.io/packagist/php-v/hryagstn/laravel-scalpel?style=flat-square)](https://packagist.org/packages/hryagstn/laravel-scalpel)
-[![Laravel Version](https://img.shields.io/badge/laravel-10.x%20|%2011.x%20|%2012.x%20|%2013.x-blue?style=flat-square)](https://packagist.org/packages/hryagstn/laravel-scalpel)
-[![Website](https://img.shields.io/badge/website-hryagstn.github.io%2Flaravel--scalpel-coral?style=flat-square)](https://hryagstn.github.io/laravel-scalpel/)
-[![License](https://img.shields.io/packagist/l/hryagstn/laravel-scalpel?style=flat-square)](LICENSE)
+<p align="center">
+  <img src="docs/logo.png" alt="Laravel Scalpel Logo" width="160">
+</p>
 
-# 🔪 laravel-scalpel
+<h1 align="center">Laravel Scalpel</h1>
 
-**Intrusion Evidence Scanner for Laravel**
+<p align="center">
+  <strong>Intrusion Evidence Scanner for Laravel</strong>
+</p>
+
+<p align="center">
+  <a href="https://github.com/hryagstn/laravel-scalpel/actions"><img src="https://img.shields.io/github/actions/workflow/status/hryagstn/laravel-scalpel/tests.yml?branch=main&style=flat-square" alt="Build Status"></a>
+  <a href="https://packagist.org/packages/hryagstn/laravel-scalpel"><img src="https://img.shields.io/packagist/v/hryagstn/laravel-scalpel.svg?style=flat-square" alt="Latest Version on Packagist"></a>
+  <a href="https://packagist.org/packages/hryagstn/laravel-scalpel"><img src="https://img.shields.io/php-v/hryagstn/laravel-scalpel?style=flat-square" alt="PHP Version"></a>
+  <a href="https://packagist.org/packages/hryagstn/laravel-scalpel"><img src="https://img.shields.io/badge/laravel-10.x%20|%2011.x%20|%2012.x%20|%2013.x-blue?style=flat-square" alt="Laravel Version"></a>
+  <a href="https://hryagstn.github.io/laravel-scalpel/"><img src="https://img.shields.io/badge/website-hryagstn.github.io%2Flaravel--scalpel-coral?style=flat-square" alt="Website"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/packagist/l/hryagstn/laravel-scalpel?style=flat-square" alt="License"></a>
+</p>
 
 A zero-dependency, filesystem-level forensic scanner that detects signs of compromise in your Laravel application — obfuscated backdoors, rogue PHP files, tampered `.htaccess` directives, missing `.env` files, and unexpected filesystem changes.
 
@@ -21,12 +29,10 @@ It often starts the same way: a production Laravel app is quietly compromised. O
 
 These attacks don't trigger your WAF. They don't show up in your application logs. The malicious files sit silently on disk, waiting.
 
-**laravel-scalpel is not a WAF, firewall, or runtime protection layer.** It is a *forensic filesystem scanner* — a post-incident or preventive tool that examines your project's file structure and contents for evidence of intrusion. Think of it as a security audit you can run on-demand or in CI/CD.
+**Laravel Scalpel is not a WAF, firewall, or runtime protection layer.** It is a *forensic filesystem scanner* — a post-incident or preventive tool that examines your project's file structure and contents for evidence of intrusion. Think of it as a security audit you can run on-demand or in CI/CD.
 
-Unlike configuration auditors that check for *potential* vulnerabilities, 
-laravel-scalpel looks for *evidence that a compromise has already occurred* — 
-making it the tool you reach for when something feels wrong, not just as a 
-preventive checklist.
+Unlike configuration auditors that check for *potential* vulnerabilities, Laravel Scalpel looks for *evidence that a compromise has already occurred* — 
+making it the tool you reach for when something feels wrong, not just as a preventive checklist.
 
 ---
 
@@ -154,7 +160,7 @@ php artisan scalpel:diff --format=json
 
 ## 🔍 How It Works
 
-laravel-scalpel ships with five independent scanners. Each focuses on a specific class of intrusion evidence.
+Laravel Scalpel ships with five independent scanners. Each focuses on a specific class of intrusion evidence.
 
 ### Structural Anomaly Scanner
 
@@ -340,7 +346,7 @@ Minimum severity level to include in results. Findings below this level are sile
 
 ## 🔄 CI/CD Integration
 
-laravel-scalpel uses exit codes to signal results, making it straightforward to integrate into CI/CD pipelines.
+Laravel Scalpel uses exit codes to signal results, making it straightforward to integrate into CI/CD pipelines.
 
 ### GitHub Actions Example
 
@@ -396,9 +402,112 @@ This ensures the baseline always reflects the post-deployment known-good state.
 
 ## Automation & Monitoring
 
-Pair laravel-scalpel with [n8n-bastion](https://github.com/hryagstn/n8n-bastion)
+Pair Laravel Scalpel with [n8n-bastion](https://github.com/hryagstn/n8n-bastion)
 for automated scheduled scanning and real-time Telegram alerts when
 CRITICAL or HIGH findings are detected on your VPS.
+
+---
+
+## 🛡️ Security Model & Limitations
+
+### Trust Boundary & Process Space
+
+Laravel Scalpel is designed as a **detection layer**, not a **containment layer**. Because it runs as a PHP Artisan command within your application's environment:
+- It runs with the same operating system user and permissions as your web server/PHP process.
+- It shares the same memory space and filesystem access.
+- It operates within the same trust boundary as the application code it is inspecting.
+
+### What This Means in Practice
+
+If an attacker achieves arbitrary code execution with the ability to write to the filesystem:
+- They could theoretically modify the Laravel Scalpel source files or configuration to suppress scan results.
+- They could intercept or delete logs before they are reported.
+- They could tamper with the generated JSON reports to hide signs of intrusion.
+
+This is an inherent limitation of *any* in-process security scanner and is not unique to Laravel Scalpel.
+
+### Recommended Production Mitigations
+
+To run Laravel Scalpel securely in production environments, pair it with standard infrastructure-level hardening:
+
+1. **External Scan Triggers:** Instead of relying on web-accessible triggers, trigger scans externally via a secure task runner (e.g., system `cron` or the [n8n-bastion](https://github.com/hryagstn/n8n-bastion) `sentinel.sh` pattern) running under a different user namespace.
+2. **Infrastructure Isolation:** Use read-only filesystems (e.g., in Docker containers) for code zones (`app/`, `bootstrap/`, `config/`, `public/`) so attackers cannot write new files or tamper with existing code, making Laravel Scalpel scans highly predictable and robust.
+3. **Decoupled Output Channels:** Save outputs to write-once/read-many logs or stream findings immediately to an external log ingestion endpoint.
+4. **"Smoke Alarm" Mindset:** Treat Laravel Scalpel as a lightweight, early-warning "smoke alarm" to trigger quick alerts rather than a replacement for network firewalls, OS-level file integrity monitoring (FIM), or WAF policies.
+
+### Output Integrity via HMAC Signing
+
+To prevent tampering with scan reports in transit between execution and delivery to log consumers (such as an external webhook or monitoring agent), Laravel Scalpel includes built-in HMAC signing for JSON outputs.
+
+#### How It Works
+When enabled, Laravel Scalpel generates an `HMAC-SHA256` signature of the canonical JSON output payload and appends it as a top-level `"signature"` field.
+
+- **What it protects against:** Tampering with the report payload *after* generation (e.g., intercepting and modifying the report on disk or in transit).
+- **What it does NOT protect against:** An attacker with root/write privileges disabling the scan entirely, or extracting the signing key from the environment if the key is stored inside the compromised server.
+
+#### Configuration & Usage
+
+Enable signing in your `config/scalpel.php` or `.env` file:
+
+```env
+SCALPEL_SIGNING_ENABLED=true
+SCALPEL_SIGNING_KEY=your-secure-signing-secret-key-change-me
+```
+
+> **Warning:** The `SCALPEL_SIGNING_KEY` should **never** default to or share the same value as your `APP_KEY`. Keep it isolated. Ideally, inject this key into the runtime environment via a secrets manager or deployment pipeline rather than committing it to a local `.env` file.
+
+When you run a scan, the JSON output will include a signature:
+
+```bash
+php artisan scalpel:scan --format=json
+```
+
+Output:
+```json
+{
+    "total": 0,
+    "findings": [],
+    "signature": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}
+```
+
+#### Verifying Signatures
+
+You can verify the integrity of a scan output file using the `scalpel:verify` Artisan command:
+
+```bash
+# Verify a file
+php artisan scalpel:verify storage/scalpel-output.json
+
+# Verify via stdin
+cat storage/scalpel-output.json | php artisan scalpel:verify -
+```
+
+If the payload is authentic and untampered, the command will output a success message and exit with status code `0`. If the signature is invalid, missing, or the payload was tampered with, it will output an error and exit with status code `1`.
+
+#### Pairs Well with n8n-bastion
+
+If you are using [n8n-bastion](https://github.com/hryagstn/n8n-bastion), you can extend the `sentinel.sh` runner script to verify output integrity before sending findings to your webhooks.
+
+For example, modify your cron execution script:
+
+```bash
+# Run scan and save output
+php artisan scalpel:scan --format=json > /tmp/scalpel-output.json
+
+# Verify signature before dispatching
+if php artisan scalpel:verify /tmp/scalpel-output.json; then
+    # Send verified payload to n8n webhook
+    curl -X POST https://your-n8n-bastion-domain.com/webhook/scalpel-alert \
+      -H "Content-Type: application/json" \
+      -d @/tmp/scalpel-output.json
+else
+    # Signature failed - report tamper alert immediately!
+    curl -X POST https://your-n8n-bastion-domain.com/webhook/scalpel-alert \
+      -H "Content-Type: application/json" \
+      -d '{"status": "tampered", "error": "Signature verification failed!"}'
+fi
+```
 
 ---
 
@@ -412,4 +521,4 @@ Please make sure your code follows the existing style and includes appropriate t
 
 ## 📄 License
 
-laravel-scalpel is open-sourced software licensed under the [MIT License](LICENSE).
+Laravel Scalpel is open-sourced software licensed under the [MIT License](LICENSE).

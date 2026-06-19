@@ -203,4 +203,21 @@ return [
 
     'severity_threshold' => 'LOW',
 
+    /*
+    |--------------------------------------------------------------------------
+    | Output Signing
+    |--------------------------------------------------------------------------
+    |
+    | When enabled, laravel-scalpel will sign its JSON scan results using HMAC.
+    | This prevents tampering with the JSON report after it is written to disk.
+    | Note that the signing key should NOT default to APP_KEY, but must be
+    | a separate, dedicated secret.
+    |
+    */
+
+    'signing' => [
+        'enabled' => env('SCALPEL_SIGNING_ENABLED', false),
+        'key' => env('SCALPEL_SIGNING_KEY'),
+    ],
+
 ];

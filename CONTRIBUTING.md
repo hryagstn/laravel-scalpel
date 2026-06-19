@@ -1,6 +1,10 @@
-# Contributing to laravel-scalpel
+<p align="center">
+  <img src="docs/logo.png" alt="Laravel Scalpel Logo" width="120">
+</p>
 
-Thank you for your interest in contributing to **laravel-scalpel**! We welcome and appreciate all contributions, from reporting bugs to suggesting new features and writing code.
+<h1 align="center">Contributing to Laravel Scalpel</h1>
+
+Thank you for your interest in contributing to **Laravel Scalpel**! We welcome and appreciate all contributions, from reporting bugs to suggesting new features and writing code.
 
 By participating in this project, you help make Laravel applications more secure for everyone.
 
@@ -111,4 +115,4 @@ To maintain a clean and consistent codebase:
 
 ## License
 
-By contributing to laravel-scalpel, you agree that your contributions will be licensed under the MIT License of the project.
+By contributing to Laravel Scalpel, you agree that your contributions will be licensed under the MIT License of the project.

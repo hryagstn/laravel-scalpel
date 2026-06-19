@@ -246,10 +246,24 @@ final class ScalpelScanCommand extends Command
      */
     private function outputJson(FindingCollection $findings): void
     {
-        $this->line((string) json_encode([
+        $payload = [
             'total'    => $findings->count(),
             'findings' => $findings->toArray(),
-        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        ];
+
+        $json = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+
+        if (config('scalpel.signing.enabled', false)) {
+            $key = config('scalpel.signing.key');
+            if (empty($key)) {
+                throw new \RuntimeException('Scalpel signing is enabled but the signing key (SCALPEL_SIGNING_KEY) is not configured.');
+            }
+            $signature = hash_hmac('sha256', $json, $key);
+            $payload['signature'] = $signature;
+            $json = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        }
+
+        $this->line((string) $json);
     }
 
     /**
