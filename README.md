@@ -404,15 +404,7 @@ CRITICAL or HIGH findings are detected on your VPS.
 
 ## 🤝 Contributing
 
-Contributions are welcome! Here's how to get started:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/my-feature`)
-3. Write tests for your changes
-4. Ensure all tests pass (`composer test`)
-5. Commit your changes (`git commit -m 'Add my feature'`)
-6. Push to your branch (`git push origin feature/my-feature`)
-7. Open a Pull Request
+Contributions are welcome! Please read our [contributing guide](CONTRIBUTING.md) to learn how to get started, set up the development environment, and run tests.
 
 Please make sure your code follows the existing style and includes appropriate tests.
 
