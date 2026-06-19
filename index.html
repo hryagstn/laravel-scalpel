@@ -56,6 +56,7 @@
                 <ul>
                     <li><a href="#threat-model">Why Scalpel?</a></li>
                     <li><a href="#scanners">Scanners</a></li>
+                    <li><a href="#security-model">Security Model</a></li>
                     <li><a href="#config-reference">Configuration</a></li>
                     <li><a href="#quick-start">Quick Start</a></li>
                     <li class="dropdown">
@@ -95,6 +96,7 @@
             <ul>
                 <li><a href="#threat-model">Why Scalpel?</a></li>
                 <li><a href="#scanners">Scanners</a></li>
+                <li><a href="#security-model">Security Model</a></li>
                 <li><a href="#config-reference">Configuration</a></li>
                 <li><a href="#quick-start">Quick Start</a></li>
                 <li><a href="https://github.com/hryagstn/n8n-bastion" target="_blank" rel="noopener">n8n-bastion</a>
@@ -375,6 +377,56 @@
                         <li>Detects complete env file deletion/truncation</li>
                         <li>Flags empty env blocks blocking logging engines</li>
                     </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Security Model & Limitations Section -->
+    <section id="security-model" class="security-section">
+        <div class="glow-bg glow-security"></div>
+        <div class="container">
+            <div class="section-header">
+                <span class="section-subtitle">TRUST BOUNDARIES & HARDENING</span>
+                <h2 class="section-title">Security Model & Limitations</h2>
+                <p class="section-lead">
+                    An honest overview of process isolation, potential attack surfaces, and production mitigations.
+                </p>
+            </div>
+
+            <div class="security-layout">
+                <div class="security-main-card">
+                    <div class="card-badge">THE REALITY OF IN-PROCESS AGENTS</div>
+                    <h3>Understanding the Trust Boundary</h3>
+                    <p>
+                        laravel-scalpel operates as a <strong>detection layer</strong> rather than a containment or sandbox layer. Because it is executed as a PHP Artisan command within your web-application workspace, it:
+                    </p>
+                    <ul class="styled-list">
+                        <li>Runs with the <strong>same user permissions</strong> as PHP (e.g. <code>www-data</code>).</li>
+                        <li>Shares the same <strong>memory namespace and process space</strong> as standard web requests.</li>
+                        <li>Has access to the same <strong>writable directories</strong> on the server disk.</li>
+                    </ul>
+                    <p class="highlight-p">
+                        ⚠️ <strong>Attacker Tampering Risk:</strong> A sufficiently skilled intruder who obtains raw PHP file execution could alter the scanner code, override configuration keys, or intercept report generation before results are dispatched.
+                    </p>
+                </div>
+
+                <div class="security-grid">
+                    <div class="sec-card">
+                        <div class="sec-icon">🔒</div>
+                        <h4>HMAC Output Signing</h4>
+                        <p>
+                            Sign JSON scan outputs via <code>HMAC-SHA256</code> to guarantee integrity. Any post-scan report modifications during transport are caught instantly by <code>scalpel:verify</code>.
+                        </p>
+                    </div>
+
+                    <div class="sec-card">
+                        <div class="sec-icon">⚙️</div>
+                        <h4>Production Hardening</h4>
+                        <p>
+                            Trigger scans externally via secure <code>cron</code> contexts running as distinct user profiles. Pair with read-only containers (Docker) to keep code zones immune to write modifications.
+                        </p>
+                    </div>
                 </div>
             </div>
         </div>

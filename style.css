@@ -1334,3 +1334,140 @@ ul {
     opacity: 1;
     transform: translateY(0);
 }
+
+/* Security Model & Limitations Section Styles */
+.security-section {
+    padding: 100px 0;
+    position: relative;
+    border-top: 1px solid var(--clr-border);
+}
+
+.glow-security {
+    top: 30%;
+    right: 10%;
+    width: 40vw;
+    height: 40vw;
+    background-color: rgba(255, 45, 32, 0.03);
+}
+
+.security-layout {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2rem;
+}
+
+@media (min-width: 1024px) {
+    .security-layout {
+        grid-template-columns: 1.2fr 0.8fr;
+    }
+}
+
+.security-main-card {
+    background-color: var(--clr-surface-card);
+    border: 1px solid var(--clr-border);
+    border-radius: var(--radius-lg);
+    padding: 3rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.security-main-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: linear-gradient(to bottom, var(--clr-primary), var(--clr-warning));
+}
+
+.card-badge {
+    align-self: flex-start;
+    font-size: 0.75rem;
+    font-weight: 800;
+    color: var(--clr-primary);
+    background-color: rgba(255, 45, 32, 0.1);
+    padding: 0.25rem 0.75rem;
+    border-radius: var(--radius-pill);
+    letter-spacing: 0.05em;
+}
+
+.security-main-card h3 {
+    font-size: 1.75rem;
+    color: #ffffff;
+}
+
+.security-main-card p {
+    color: var(--clr-text-muted);
+    font-size: 1.05rem;
+    line-height: 1.6;
+}
+
+.styled-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-left: 0.5rem;
+}
+
+.styled-list li {
+    font-size: 0.95rem;
+    color: var(--clr-text-muted);
+    position: relative;
+    padding-left: 1.5rem;
+}
+
+.styled-list li::before {
+    content: '→';
+    color: var(--clr-primary);
+    position: absolute;
+    left: 0;
+    font-weight: bold;
+}
+
+.highlight-p {
+    background-color: rgba(245, 158, 11, 0.05);
+    border: 1px dashed rgba(245, 158, 11, 0.2);
+    border-radius: var(--radius-sm);
+    padding: 1.25rem;
+    color: #E2E8F0 !important;
+}
+
+.security-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+.sec-card {
+    background-color: var(--clr-surface);
+    border: 1px solid var(--clr-border);
+    border-radius: var(--radius-md);
+    padding: 2rem;
+    transition: all var(--transition-normal);
+}
+
+.sec-card:hover {
+    transform: translateY(-5px);
+    border-color: rgba(255, 45, 32, 0.2);
+}
+
+.sec-icon {
+    font-size: 1.75rem;
+    margin-bottom: 1rem;
+}
+
+.sec-card h4 {
+    font-size: 1.2rem;
+    color: #ffffff;
+    margin-bottom: 0.5rem;
+}
+
+.sec-card p {
+    font-size: 0.9rem;
+    color: var(--clr-text-muted);
+    line-height: 1.5;
+}
