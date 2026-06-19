@@ -5,6 +5,14 @@ All notable changes to `laravel-scalpel` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-06-19
+
+### Added
+- Added `signing.enabled` and `signing.key` configuration options to sign JSON scan outputs using HMAC-SHA256.
+- Added `scalpel:verify` command to verify the output integrity of signed scan reports.
+- Added a "Security Model & Limitations" section to the README and landing page outlining trust boundaries and mitigations.
+- Added centered branding logo inside `README.md` and `CONTRIBUTING.md`.
+
 ## [1.3.3] - 2026-06-18
 
 ### Fixed
