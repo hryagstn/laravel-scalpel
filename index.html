@@ -470,11 +470,10 @@
                         <pre class="code-block" id="code-config-content"><code><span class="keyword">&lt;?php</span>
 
 <span class="keyword">return</span> [
-    <span class="comment">// Directories where PHP files should not exist</span>
+    <span class="comment">// Directories where PHP files should NOT exist</span>
     <span class="string">'non_php_zones'</span> => [
         <span class="string">'public'</span>,
         <span class="string">'storage'</span>,
-        <span class="string">'bootstrap/cache'</span>,
     ],
 
     <span class="comment">// Whitelisted PHP files within static directories</span>
@@ -482,11 +481,23 @@
         <span class="string">'public/index.php'</span>,
     ],
 
+    <span class="comment">// Subdirectories within static zones where PHP files are expected</span>
+    <span class="string">'structural_allowed_directories'</span> => [
+        <span class="string">'public/vendor'</span>,
+        <span class="string">'storage/framework/views'</span>,
+        <span class="string">'storage/framework/cache'</span>,
+    ],
+
     <span class="comment">// Excluded from ALL scans</span>
     <span class="string">'excluded_paths'</span> => [
-        <span class="string">'vendor'</span>,
         <span class="string">'node_modules'</span>,
         <span class="string">'.git'</span>,
+    ],
+
+    <span class="comment">// Excluded from content scanners only (still checked by baseline)</span>
+    <span class="string">'content_scan_excluded_paths'</span> => [
+        <span class="string">'vendor'</span>,
+        <span class="string">'bootstrap/cache'</span>,
     ],
 
     <span class="comment">// Target obfuscation regex checks</span>
@@ -495,12 +506,21 @@
         <span class="string">'eval_gzinflate'</span>      => <span class="constant">true</span>,
         <span class="string">'eval_str_rot13'</span>      => <span class="constant">true</span>,
         <span class="string">'eval_gzuncompress'</span>   => <span class="constant">true</span>,
+        <span class="string">'eval_gzdecode'</span>       => <span class="constant">true</span>,
         <span class="string">'assert_dynamic'</span>      => <span class="constant">true</span>,
+        <span class="string">'variable_functions'</span>  => <span class="constant">true</span>,
+        <span class="string">'preg_replace_e'</span>      => <span class="constant">true</span>,
         <span class="string">'long_encoded_string'</span> => <span class="constant">true</span>,
     ],
 
     <span class="string">'long_string_threshold'</span> => <span class="number">500</span>,
     <span class="string">'severity_threshold'</span> => <span class="string">'LOW'</span>,
+
+    <span class="comment">// Output HMAC signature signing settings</span>
+    <span class="string">'signing'</span> => [
+        <span class="string">'enabled'</span> => <span class="keyword">env</span>(<span class="string">'SCALPEL_SIGNING_ENABLED'</span>, <span class="constant">false</span>),
+        <span class="string">'key'</span> => <span class="keyword">env</span>(<span class="string">'SCALPEL_SIGNING_KEY'</span>),
+    ],
 ];</code></pre>
                     </div>
 
