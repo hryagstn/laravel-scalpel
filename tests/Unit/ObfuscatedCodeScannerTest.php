@@ -165,4 +165,16 @@ class ObfuscatedCodeScannerTest extends TestCase
 
         $this->assertCount(0, $findings);
     }
+
+    public function test_handles_broken_symlinks_safely(): void
+    {
+        @symlink($this->tempDir . '/non_existent_file.php', $this->tempDir . '/test.php');
+
+        $scanner = new ObfuscatedCodeScanner();
+        $findings = $scanner->scan($this->tempDir);
+
+        $this->assertCount(0, $findings);
+
+        @unlink($this->tempDir . '/test.php');
+    }
 }

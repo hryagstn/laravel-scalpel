@@ -97,4 +97,17 @@ class HtaccessScannerTest extends TestCase
         $this->assertCount(1, $findings);
         $this->assertEquals('CRITICAL', $findings->all()[0]->severity->value);
     }
+
+    public function test_handles_broken_symlinks_safely(): void
+    {
+        // Create a broken symlink named .htaccess
+        @symlink($this->tempDir . '/non_existent_file.htaccess', $this->tempDir . '/.htaccess');
+
+        $scanner = new HtaccessScanner();
+        $findings = $scanner->scan($this->tempDir);
+
+        $this->assertCount(0, $findings);
+
+        @unlink($this->tempDir . '/.htaccess');
+    }
 }

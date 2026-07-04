@@ -61,7 +61,11 @@ class StructuralAnomalyScanner extends BaseScanner
                 ->name('*.php');
 
             foreach ($finder as $file) {
-                $relativePath = $this->relativePath($file->getRealPath(), $basePath);
+                $realPath = $file->getRealPath();
+                if ($realPath === false) {
+                    continue;
+                }
+                $relativePath = $this->relativePath($realPath, $basePath);
 
                 // Skip globally excluded paths
                 if ($this->isExcluded($relativePath, $excludedPaths)) {

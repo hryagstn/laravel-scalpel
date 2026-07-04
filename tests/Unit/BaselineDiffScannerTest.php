@@ -138,4 +138,26 @@ class BaselineDiffScannerTest extends TestCase
         $scanFinishEvent = end($scanEvents);
         $this->assertEquals('finish', $scanFinishEvent[0]);
     }
+
+    public function test_handles_broken_symlinks_safely(): void
+    {
+        $scanner = new BaselineDiffScanner();
+
+        @mkdir($this->tempDir . '/app', 0777, true);
+        file_put_contents($this->tempDir . '/app/User.php', '<?php class User {}');
+
+        // Create a broken symlink in the project root
+        @symlink($this->tempDir . '/non_existent_file.php', $this->tempDir . '/broken_link.php');
+
+        // 1. Baseline creation should complete without TypeError or failure
+        $stats = $scanner->createBaseline($this->tempDir);
+        $this->assertEquals(1, $stats['files']); // Only app/User.php, broken link is ignored
+
+        // 2. Scan should complete and find 0 findings
+        $findings = $scanner->scan($this->tempDir);
+        $this->assertCount(0, $findings);
+
+        // Clean up symlink specifically
+        @unlink($this->tempDir . '/broken_link.php');
+    }
 }

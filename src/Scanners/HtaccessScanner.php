@@ -105,6 +105,9 @@ class HtaccessScanner extends BaseScanner
                 }
 
                 $fullPath = $file->getRealPath();
+                if ($fullPath === false) {
+                    continue;
+                }
                 $relativePath = $this->relativePath($fullPath, $basePath);
 
                 if ($this->isExcluded($relativePath, $excludedPaths)) {

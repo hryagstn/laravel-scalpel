@@ -42,8 +42,12 @@ class ObfuscatedCodeScanner extends BaseScanner
         $finder->name('*.php');
 
         foreach ($finder as $file) {
-            $relativePath = $this->relativePath($file->getRealPath(), $basePath);
-            $this->scanFile($file->getRealPath(), $relativePath, $patterns, $findings);
+            $realPath = $file->getRealPath();
+            if ($realPath === false) {
+                continue;
+            }
+            $relativePath = $this->relativePath($realPath, $basePath);
+            $this->scanFile($realPath, $relativePath, $patterns, $findings);
         }
 
         return $findings;

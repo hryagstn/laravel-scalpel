@@ -110,4 +110,17 @@ class MyService extends Facade
         $this->assertContains('storage/app/backdoor.php', $files);
         $this->assertCount(1, $findings);
     }
+
+    public function test_handles_broken_symlinks_safely(): void
+    {
+        @mkdir($this->tempDir . '/public', 0777, true);
+        @symlink($this->tempDir . '/non_existent_file.php', $this->tempDir . '/public/test.php');
+
+        $scanner = new StructuralAnomalyScanner();
+        $findings = $scanner->scan($this->tempDir);
+
+        $this->assertCount(0, $findings);
+
+        @unlink($this->tempDir . '/public/test.php');
+    }
 }

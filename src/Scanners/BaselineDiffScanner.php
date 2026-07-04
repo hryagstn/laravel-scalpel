@@ -43,7 +43,12 @@ class BaselineDiffScanner extends BaseScanner
         $processed = 0;
 
         foreach ($finder as $file) {
-            $relativePath = $this->relativePath($file->getRealPath(), $basePath);
+            $realPath = $file->getRealPath();
+            if ($realPath === false) {
+                continue;
+            }
+
+            $relativePath = $this->relativePath($realPath, $basePath);
 
             if ($this->isExcluded($relativePath, $excludedPaths)) {
                 continue;
@@ -53,7 +58,7 @@ class BaselineDiffScanner extends BaseScanner
             $totalSize += $fileSize;
 
             $snapshot[$relativePath] = [
-                'hash'        => hash_file('sha256', $file->getRealPath()),
+                'hash'        => hash_file('sha256', $realPath),
                 'size'        => $fileSize,
                 'modified_at' => $file->getMTime(),
             ];
@@ -287,14 +292,19 @@ class BaselineDiffScanner extends BaseScanner
         $processed = 0;
 
         foreach ($finder as $file) {
-            $relativePath = $this->relativePath($file->getRealPath(), $basePath);
+            $realPath = $file->getRealPath();
+            if ($realPath === false) {
+                continue;
+            }
+
+            $relativePath = $this->relativePath($realPath, $basePath);
 
             if ($this->isExcluded($relativePath, $excludedPaths)) {
                 continue;
             }
 
             $files[$relativePath] = [
-                'hash'        => hash_file('sha256', $file->getRealPath()),
+                'hash'        => hash_file('sha256', $realPath),
                 'size'        => $file->getSize(),
                 'modified_at' => $file->getMTime(),
             ];
