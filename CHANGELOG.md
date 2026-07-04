@@ -5,9 +5,16 @@ All notable changes to `laravel-scalpel` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.4.0] - 2026-06-19
+## [1.4.1] - 2026-07-05
+
+### Fixed
+- Fixed `TypeError: BaseScanner::relativePath(): Argument #1 ($fullPath) must be of type string, false given` caused by `getRealPath()` returning `false` on broken symlinks or unreadable files.
 
 ### Added
+- Added `SECURITY.md` security policy.
+- Updated documentation under `docs/` and `README.md` to keep configurations and security models aligned with recent features.
+
+## [1.4.0] - 2026-06-19
 - Added `signing.enabled` and `signing.key` configuration options to sign JSON scan outputs using HMAC-SHA256.
 - Added `scalpel:verify` command to verify the output integrity of signed scan reports.
 - Added a "Security Model & Limitations" section to the README and landing page outlining trust boundaries and mitigations.
