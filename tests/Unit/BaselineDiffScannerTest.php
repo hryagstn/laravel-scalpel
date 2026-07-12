@@ -195,4 +195,37 @@ class BaselineDiffScannerTest extends TestCase
         $this->assertCount(1, $findings);
         $this->assertStringContainsString('modified since baseline', $findings->all()[0]->description);
     }
+
+    public function test_baseline_recreation_uses_deferred_hashing_when_old_baseline_exists(): void
+    {
+        $scanner = new BaselineDiffScanner();
+
+        @mkdir($this->tempDir . '/app', 0777, true);
+        $file = $this->tempDir . '/app/User.php';
+        file_put_contents($file, '<?php class User {}');
+
+        // Create initial baseline
+        $scanner->createBaseline($this->tempDir);
+
+        // Break the file content on disk but keep its mtime and size EXACTLY the same
+        $mtime = filemtime($file);
+        file_put_contents($file, '<?php class User XX');
+        touch($file, $mtime);
+
+        // Recreate baseline with fast scan enabled (should reuse the old hash from previous baseline instead of calculating the new one)
+        config(['scalpel.baseline_fast_scan' => true]);
+        $scanner->createBaseline($this->tempDir);
+
+        $baselineContents = json_decode(Storage::get('scalpel/baseline.json'), true);
+        $this->assertEquals(hash_file('sha256', $file), hash('sha256', '<?php class User XX')); // The actual file hash on disk
+        $this->assertNotEquals($baselineContents['files']['app/User.php']['hash'], hash_file('sha256', $file)); // The baseline should still contain the OLD hash!
+        $this->assertEquals($baselineContents['files']['app/User.php']['hash'], hash('sha256', '<?php class User {}')); // Match old hash
+
+        // Now recreate baseline with fast scan disabled (should calculate the actual new hash)
+        config(['scalpel.baseline_fast_scan' => false]);
+        $scanner->createBaseline($this->tempDir);
+
+        $baselineContents = json_decode(Storage::get('scalpel/baseline.json'), true);
+        $this->assertEquals($baselineContents['files']['app/User.php']['hash'], hash_file('sha256', $file)); // Now it matches disk hash!
+    }
 }

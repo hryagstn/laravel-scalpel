@@ -5,6 +5,12 @@ All notable changes to `laravel-scalpel` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1] - 2026-07-12
+
+### Fixed
+- Optimized baseline creation (`scalpel:baseline` / `createBaseline`) and comparison (`scalpel:scan` / `buildCurrentFileMap`) to perform only a **single filesystem crawl** instead of two, by resolving Symfony Finder iterators to arrays.
+- Added **Deferred Hashing** to baseline recreation. Overwriting or recreating an existing baseline now skips SHA-256 calculation for unchanged files, making baseline updates extremely fast (instant) even with 14,000+ files.
+
 ## [1.5.0] - 2026-07-12
 
 ### Added

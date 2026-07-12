@@ -35,14 +35,20 @@ class BaselineDiffScanner extends BaseScanner
 
         $finder = $this->createBaselineFinder($basePath, $excludedPaths);
 
-        $totalFiles = count($finder);
+        // Convert finder to array to avoid double crawling the filesystem (once for count and once for iteration)
+        $filesArray = iterator_to_array($finder, false);
+        $totalFiles = count($filesArray);
         $this->notifyProgress('start', ['total' => $totalFiles]);
+
+        // Load existing baseline to reuse unchanged file hashes (Deferred Hashing)
+        $oldBaseline = $this->baselineExists() ? $this->loadBaseline() : null;
+        $oldFiles    = $oldBaseline['files'] ?? [];
 
         $snapshot  = [];
         $totalSize = 0;
         $processed = 0;
 
-        foreach ($finder as $file) {
+        foreach ($filesArray as $file) {
             $realPath = $file->getRealPath();
             if ($realPath === false) {
                 continue;
@@ -56,11 +62,24 @@ class BaselineDiffScanner extends BaseScanner
 
             $fileSize   = $file->getSize();
             $totalSize += $fileSize;
+            $modifiedAt = $file->getMTime();
+            $hash       = null;
+
+            if (! empty($oldFiles) && isset($oldFiles[$relativePath]) && config('scalpel.baseline_fast_scan', true)) {
+                $oldFile = $oldFiles[$relativePath];
+                if ($oldFile['size'] === $fileSize && $oldFile['modified_at'] === $modifiedAt) {
+                    $hash = $oldFile['hash'];
+                }
+            }
+
+            if ($hash === null) {
+                $hash = hash_file('sha256', $realPath);
+            }
 
             $snapshot[$relativePath] = [
-                'hash'        => hash_file('sha256', $realPath),
+                'hash'        => $hash,
                 'size'        => $fileSize,
-                'modified_at' => $file->getMTime(),
+                'modified_at' => $modifiedAt,
             ];
 
             $processed++;
@@ -286,13 +305,15 @@ class BaselineDiffScanner extends BaseScanner
     {
         $finder = $this->createBaselineFinder($basePath, $excludedPaths);
 
-        $totalFiles = count($finder);
+        // Convert finder to array to avoid double crawling the filesystem (once for count and once for iteration)
+        $filesArray = iterator_to_array($finder, false);
+        $totalFiles = count($filesArray);
         $this->notifyProgress('start', ['total' => $totalFiles]);
 
         $files  = [];
         $processed = 0;
 
-        foreach ($finder as $file) {
+        foreach ($filesArray as $file) {
             $realPath = $file->getRealPath();
             if ($realPath === false) {
                 continue;
