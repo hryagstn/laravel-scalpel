@@ -5,6 +5,15 @@ All notable changes to `laravel-scalpel` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-07-12
+
+### Added
+- Added metadata-based fast scan (Deferred Hashing) to `BaselineDiffScanner`. When enabled, files with matching size and modification time (mtime) skip SHA-256 hash recalculation, resulting in extremely fast scan performance.
+- Added `scalpel.baseline_fast_scan` configuration option (via `SCALPEL_BASELINE_FAST_SCAN` env).
+
+### Changed
+- Excluded `storage/app` from `baseline_excluded_paths` by default to avoid slow baseline hashing of dynamic user uploads, while keeping it secured via `StructuralAnomalyScanner`.
+
 ## [1.4.1] - 2026-07-05
 
 ### Fixed

@@ -160,4 +160,39 @@ class BaselineDiffScannerTest extends TestCase
         // Clean up symlink specifically
         @unlink($this->tempDir . '/broken_link.php');
     }
+
+    public function test_baseline_fast_scan_avoids_recalculating_hashes_if_mtime_and_size_match(): void
+    {
+        $scanner = new BaselineDiffScanner();
+
+        @mkdir($this->tempDir . '/app', 0777, true);
+        $file = $this->tempDir . '/app/User.php';
+        file_put_contents($file, '<?php class User {}');
+
+        // Create baseline
+        $scanner->createBaseline($this->tempDir);
+
+        // Turn on fast scan
+        config(['scalpel.baseline_fast_scan' => true]);
+
+        // Break the file content on disk but keep its mtime and size EXACTLY the same!
+        // To keep size exactly the same, replace with content of the same length:
+        // Original: '<?php class User {}' (19 characters)
+        // Modified: '<?php class User XX' (19 characters)
+        $mtime = filemtime($file);
+        file_put_contents($file, '<?php class User XX');
+        touch($file, $mtime);
+
+        // Scan with fast scan enabled (should NOT find differences because mtime & size match and fast scan bypasses hashing)
+        $findings = $scanner->scan($this->tempDir);
+        $this->assertCount(0, $findings);
+
+        // Turn off fast scan
+        config(['scalpel.baseline_fast_scan' => false]);
+
+        // Scan with fast scan disabled (should detect modified file!)
+        $findings = $scanner->scan($this->tempDir);
+        $this->assertCount(1, $findings);
+        $this->assertStringContainsString('modified since baseline', $findings->all()[0]->description);
+    }
 }

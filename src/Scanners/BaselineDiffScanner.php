@@ -144,7 +144,7 @@ class BaselineDiffScanner extends BaseScanner
         /** @var array<string, array{hash: string, size: int, modified_at: int}> $baselineFiles */
         $baselineFiles = $baseline['files'] ?? [];
         $excludedPaths = $this->getBaselineExcludedPaths();
-        $currentFiles  = $this->buildCurrentFileMap($basePath, $excludedPaths);
+        $currentFiles  = $this->buildCurrentFileMap($basePath, $excludedPaths, $baselineFiles);
 
         // Check for NEW and MODIFIED files
         foreach ($currentFiles as $relativePath => $fileData) {
@@ -279,9 +279,10 @@ class BaselineDiffScanner extends BaseScanner
      *
      * @param string   $basePath
      * @param string[] $excludedPaths
+     * @param array<string, array{hash: string, size: int, modified_at: int}>|null $baselineFiles
      * @return array<string, array{hash: string, size: int, modified_at: int}>
      */
-    private function buildCurrentFileMap(string $basePath, array $excludedPaths): array
+    private function buildCurrentFileMap(string $basePath, array $excludedPaths, ?array $baselineFiles = null): array
     {
         $finder = $this->createBaselineFinder($basePath, $excludedPaths);
 
@@ -303,10 +304,25 @@ class BaselineDiffScanner extends BaseScanner
                 continue;
             }
 
+            $fileSize   = $file->getSize();
+            $modifiedAt = $file->getMTime();
+            $hash       = null;
+
+            if ($baselineFiles !== null && isset($baselineFiles[$relativePath]) && config('scalpel.baseline_fast_scan', true)) {
+                $baselineFile = $baselineFiles[$relativePath];
+                if ($baselineFile['size'] === $fileSize && $baselineFile['modified_at'] === $modifiedAt) {
+                    $hash = $baselineFile['hash'];
+                }
+            }
+
+            if ($hash === null) {
+                $hash = hash_file('sha256', $realPath);
+            }
+
             $files[$relativePath] = [
-                'hash'        => hash_file('sha256', $realPath),
-                'size'        => $file->getSize(),
-                'modified_at' => $file->getMTime(),
+                'hash'        => $hash,
+                'size'        => $fileSize,
+                'modified_at' => $modifiedAt,
             ];
 
             $processed++;

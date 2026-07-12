@@ -177,6 +177,7 @@ return [
         'storage/framework/views',
         'storage/app/scalpel',
         'storage/app/private/scalpel',
+        'storage/app',
     ],
 
     /*
@@ -190,6 +191,22 @@ return [
     */
 
     'baseline_path' => 'scalpel/baseline.json',
+
+    /*
+    |--------------------------------------------------------------------------
+    | Baseline Fast Scan Mode
+    |--------------------------------------------------------------------------
+    |
+    | When enabled, Scalpel will compare a file's size and modified time (mtime)
+    | against the baseline before calculating its SHA-256 hash. If they match,
+    | the hash computation is skipped, drastically improving performance.
+    |
+    | Disable this (set to false) to always calculate SHA-256 hashes, which
+    | provides protection against sophisticated 'timestomping' attacks.
+    |
+    */
+
+    'baseline_fast_scan' => env('SCALPEL_BASELINE_FAST_SCAN', true),
 
     /*
     |--------------------------------------------------------------------------
