@@ -19,6 +19,7 @@ final class ScalpelScanCommand extends Command
     protected $signature = 'scalpel:scan
         {--only= : Comma-separated list of scanners to run}
         {--format=table : Output format (table or json)}
+        {--fast : Enable metadata-based fast scan (deferred hashing)}
         {--no-banner : Suppress the banner/header}';
 
     /**
@@ -46,6 +47,10 @@ final class ScalpelScanCommand extends Command
      */
     public function handle(Scalpel $scalpel): int
     {
+        if ($this->option('fast')) {
+            config(['scalpel.baseline_fast_scan' => true]);
+        }
+
         if (! $this->shouldSuppressBanner()) {
             $this->displayBanner();
         }

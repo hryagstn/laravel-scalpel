@@ -5,6 +5,14 @@ All notable changes to `laravel-scalpel` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.2] - 2026-07-12
+
+### Added
+- Added `--fast` CLI option to `scalpel:baseline`, `scalpel:scan`, and `scalpel:diff` commands.
+
+### Changed
+- Changed `baseline_fast_scan` default setting to `false` (Strict Mode) to provide maximum security by default, especially suitable for automated integration environments like n8n. Passing the `--fast` flag enables the metadata-based fast scan mode for individual executions.
+
 ## [1.5.1] - 2026-07-12
 
 ### Fixed

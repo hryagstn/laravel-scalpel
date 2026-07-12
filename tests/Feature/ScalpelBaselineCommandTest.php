@@ -97,5 +97,18 @@ class ScalpelBaselineCommandTest extends TestCase
         $this->assertStringNotContainsString('Laravel Scalpel', $output);
         $this->assertStringContainsString('Creating baseline snapshot', $output);
     }
+
+    public function test_baseline_command_fast_option_sets_config(): void
+    {
+        Storage::assertMissing('scalpel/baseline.json');
+        
+        $this->assertFalse(config('scalpel.baseline_fast_scan', false));
+
+        $this->artisan('scalpel:baseline --fast')
+            ->expectsOutputToContain('Baseline created successfully')
+            ->assertExitCode(0);
+
+        $this->assertTrue(config('scalpel.baseline_fast_scan'));
+    }
 }
 

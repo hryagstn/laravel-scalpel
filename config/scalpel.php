@@ -201,12 +201,12 @@ return [
     | against the baseline before calculating its SHA-256 hash. If they match,
     | the hash computation is skipped, drastically improving performance.
     |
-    | Disable this (set to false) to always calculate SHA-256 hashes, which
-    | provides protection against sophisticated 'timestomping' attacks.
+    | Default: false (strict mode) for maximum security against sophisticated
+    | 'timestomping' attacks. Enable this explicitly using the --fast CLI flag.
     |
     */
 
-    'baseline_fast_scan' => env('SCALPEL_BASELINE_FAST_SCAN', true),
+    'baseline_fast_scan' => env('SCALPEL_BASELINE_FAST_SCAN', false),
 
     /*
     |--------------------------------------------------------------------------

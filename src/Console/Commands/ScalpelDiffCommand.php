@@ -20,6 +20,7 @@ final class ScalpelDiffCommand extends Command
      */
     protected $signature = 'scalpel:diff
         {--format=table : Output format (table or json)}
+        {--fast : Enable metadata-based fast scan (deferred hashing)}
         {--no-banner : Suppress the banner/header}';
 
     /**
@@ -34,6 +35,10 @@ final class ScalpelDiffCommand extends Command
      */
     public function handle(Scalpel $scalpel): int
     {
+        if ($this->option('fast')) {
+            config(['scalpel.baseline_fast_scan' => true]);
+        }
+
         if (! $this->shouldSuppressBanner()) {
             $version = ltrim(Scalpel::version(), 'v');
             $this->newLine();
