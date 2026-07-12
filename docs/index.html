@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Build: v1.4.1 - 2026-07-05 -->
+<!-- Build: v1.5.2 - 2026-07-12 -->
 <html lang="en">
 
 <head>
@@ -50,7 +50,7 @@
             <a href="#" class="logo-wrapper">
                 <img src="logo.png" alt="Laravel Scalpel Logo" class="header-logo">
                 <span class="logo-text">Laravel <span class="accent-text">Scalpel</span></span>
-                <span class="badge-version">v1.4.1</span>
+                <span class="badge-version">v1.5.2</span>
             </a>
 
             <nav class="main-nav" aria-label="Main Navigation">
@@ -516,6 +516,9 @@
 
     <span class="string">'long_string_threshold'</span> => <span class="number">500</span>,
     <span class="string">'severity_threshold'</span> => <span class="string">'LOW'</span>,
+
+    <span class="comment">// Use metadata-based fast scans; set true via --fast parameter or env override</span>
+    <span class="string">'baseline_fast_scan'</span> => <span class="keyword">env</span>(<span class="string">'SCALPEL_BASELINE_FAST_SCAN'</span>, <span class="constant">false</span>),
 
     <span class="comment">// Output HMAC signature signing settings</span>
     <span class="string">'signing'</span> => [
