@@ -105,6 +105,7 @@ php artisan scalpel:scan --format=json
 |------------|-----------------------------------------------------------------------------|
 | `--only`   | Comma-separated list of scanners to run: `structural`, `obfuscated`, `htaccess`, `env` |
 | `--format` | Output format: `table` (default) or `json`                                 |
+| `--fast`   | Enable metadata-based fast scan (Deferred Hashing) for this execution.      |
 
 **Exit codes:**
 
@@ -133,6 +134,7 @@ php artisan scalpel:baseline --force
 | Option    | Description                          |
 |-----------|--------------------------------------|
 | `--force` | Overwrite an existing baseline file  |
+| `--fast`  | Enable metadata-based fast scan (Deferred Hashing) for this execution. |
 
 ---
 
@@ -153,6 +155,7 @@ php artisan scalpel:diff --format=json
 | Option     | Description                                    |
 |------------|------------------------------------------------|
 | `--format` | Output format: `table` (default) or `json`     |
+| `--fast`   | Enable metadata-based fast scan (Deferred Hashing) for this execution. |
 
 **Exit codes:** Same as `scalpel:scan`.
 
