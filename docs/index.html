@@ -50,7 +50,7 @@
             <a href="#" class="logo-wrapper">
                 <img src="logo.png" alt="Laravel Scalpel Logo" class="header-logo">
                 <span class="logo-text">Laravel <span class="accent-text">Scalpel</span></span>
-                <span class="badge-version">v1.5.2</span>
+                <span class="badge-version">v1.6.0</span>
             </a>
 
             <nav class="main-nav" aria-label="Main Navigation">
@@ -304,9 +304,9 @@
                         base64 payloads.
                     </p>
                     <ul class="scanner-details">
-                        <li>Detects <code>eval(base64_decode)</code>, <code>gzinflate</code></li>
-                        <li>Flags dynamic assertions & variable functions</li>
-                        <li>Flags suspiciously long base64 strings (>=500 chars)</li>
+                        <li>Detects <code>eval(base64_decode)</code>, <code>superglobal_eval</code>, <code>dynamic_include</code></li>
+                        <li>Flags <code>create_function</code> & encoded <code>file_put_contents</code> droppers</li>
+                        <li>Flags <code>chr()</code> chaining, hex sequences, long strings (>=500 chars)</li>
                     </ul>
                 </div>
 
@@ -375,9 +375,9 @@
                         or tampering.
                     </p>
                     <ul class="scanner-details">
-                        <li>Checks file existence & write access</li>
-                        <li>Detects complete env file deletion/truncation</li>
-                        <li>Flags empty env blocks blocking logging engines</li>
+                        <li>Checks file existence & permissions</li>
+                        <li>Verifies <code>APP_KEY</code> & <code>APP_DEBUG=true</code> in production</li>
+                        <li>Supports <code>--production</code> flag & <code>APP_ENV</code> auto-detect</li>
                     </ul>
                 </div>
             </div>
@@ -504,15 +504,21 @@
 
     <span class="comment">// Target obfuscation regex checks</span>
     <span class="string">'obfuscation_patterns'</span> => [
-        <span class="string">'eval_base64_decode'</span>  => <span class="constant">true</span>,
-        <span class="string">'eval_gzinflate'</span>      => <span class="constant">true</span>,
-        <span class="string">'eval_str_rot13'</span>      => <span class="constant">true</span>,
-        <span class="string">'eval_gzuncompress'</span>   => <span class="constant">true</span>,
-        <span class="string">'eval_gzdecode'</span>       => <span class="constant">true</span>,
-        <span class="string">'assert_dynamic'</span>      => <span class="constant">true</span>,
-        <span class="string">'variable_functions'</span>  => <span class="constant">true</span>,
-        <span class="string">'preg_replace_e'</span>      => <span class="constant">true</span>,
-        <span class="string">'long_encoded_string'</span> => <span class="constant">true</span>,
+        <span class="string">'eval_base64_decode'</span>        => <span class="constant">true</span>,
+        <span class="string">'eval_gzinflate'</span>            => <span class="constant">true</span>,
+        <span class="string">'eval_str_rot13'</span>            => <span class="constant">true</span>,
+        <span class="string">'eval_gzuncompress'</span>         => <span class="constant">true</span>,
+        <span class="string">'eval_gzdecode'</span>             => <span class="constant">true</span>,
+        <span class="string">'assert_dynamic'</span>            => <span class="constant">true</span>,
+        <span class="string">'variable_functions'</span>        => <span class="constant">true</span>,
+        <span class="string">'preg_replace_e'</span>            => <span class="constant">true</span>,
+        <span class="string">'long_encoded_string'</span>       => <span class="constant">true</span>,
+        <span class="string">'create_function'</span>           => <span class="constant">true</span>,
+        <span class="string">'file_put_contents_encoded'</span> => <span class="constant">true</span>,
+        <span class="string">'superglobal_eval'</span>          => <span class="constant">true</span>,
+        <span class="string">'chr_chaining'</span>              => <span class="constant">true</span>,
+        <span class="string">'hex_escape_sequence'</span>       => <span class="constant">true</span>,
+        <span class="string">'dynamic_include'</span>           => <span class="constant">true</span>,
     ],
 
     <span class="string">'long_string_threshold'</span> => <span class="number">500</span>,
@@ -520,6 +526,9 @@
 
     <span class="comment">// Use metadata-based fast scans; set true via --fast parameter or env override</span>
     <span class="string">'baseline_fast_scan'</span> => <span class="keyword">env</span>(<span class="string">'SCALPEL_BASELINE_FAST_SCAN'</span>, <span class="constant">false</span>),
+
+    <span class="comment">// Force strict production environment checks</span>
+    <span class="string">'assume_production'</span> => <span class="keyword">env</span>(<span class="string">'SCALPEL_ASSUME_PRODUCTION'</span>, <span class="constant">false</span>),
 
     <span class="comment">// Output HMAC signature signing settings</span>
     <span class="string">'signing'</span> => [
