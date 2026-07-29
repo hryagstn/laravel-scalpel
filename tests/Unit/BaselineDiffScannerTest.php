@@ -25,13 +25,13 @@ class BaselineDiffScannerTest extends TestCase
 
     public function test_creates_baseline_and_detects_changes(): void
     {
-        $scanner = new BaselineDiffScanner();
+        $scanner = new BaselineDiffScanner;
 
         // 1. Setup initial project filesystem state
-        @mkdir($this->tempDir . '/app', 0777, true);
-        file_put_contents($this->tempDir . '/app/User.php', '<?php class User {}');
-        file_put_contents($this->tempDir . '/app/Helper.php', '<?php class Helper {}');
-        file_put_contents($this->tempDir . '/.env', 'APP_ENV=local');
+        @mkdir($this->tempDir.'/app', 0777, true);
+        file_put_contents($this->tempDir.'/app/User.php', '<?php class User {}');
+        file_put_contents($this->tempDir.'/app/Helper.php', '<?php class Helper {}');
+        file_put_contents($this->tempDir.'/.env', 'APP_ENV=local');
 
         // 2. Create the baseline
         $stats = $scanner->createBaseline($this->tempDir);
@@ -44,11 +44,11 @@ class BaselineDiffScannerTest extends TestCase
         $this->assertCount(0, $findings);
 
         // 4. Modify a file, add a new file, and delete a file
-        file_put_contents($this->tempDir . '/app/User.php', '<?php class User { /* modified */ }'); // MODIFIED
-        file_put_contents($this->tempDir . '/app/NewFile.php', '<?php class NewFile {}'); // NEW PHP (HIGH severity)
-        file_put_contents($this->tempDir . '/non-php.txt', 'Hello world'); // NEW text file (MEDIUM severity)
-        @unlink($this->tempDir . '/app/Helper.php'); // DELETED PHP (MEDIUM severity)
-        @unlink($this->tempDir . '/.env'); // DELETED .env (CRITICAL severity)
+        file_put_contents($this->tempDir.'/app/User.php', '<?php class User { /* modified */ }'); // MODIFIED
+        file_put_contents($this->tempDir.'/app/NewFile.php', '<?php class NewFile {}'); // NEW PHP (HIGH severity)
+        file_put_contents($this->tempDir.'/non-php.txt', 'Hello world'); // NEW text file (MEDIUM severity)
+        @unlink($this->tempDir.'/app/Helper.php'); // DELETED PHP (MEDIUM severity)
+        @unlink($this->tempDir.'/.env'); // DELETED .env (CRITICAL severity)
 
         // 5. Scan and assert findings
         $findings = $scanner->scan($this->tempDir);
@@ -96,11 +96,11 @@ class BaselineDiffScannerTest extends TestCase
 
     public function test_progress_callback_is_triggered_during_baseline_creation_and_scan(): void
     {
-        $scanner = new BaselineDiffScanner();
+        $scanner = new BaselineDiffScanner;
 
-        @mkdir($this->tempDir . '/app', 0777, true);
-        file_put_contents($this->tempDir . '/app/User.php', '<?php class User {}');
-        file_put_contents($this->tempDir . '/app/Helper.php', '<?php class Helper {}');
+        @mkdir($this->tempDir.'/app', 0777, true);
+        file_put_contents($this->tempDir.'/app/User.php', '<?php class User {}');
+        file_put_contents($this->tempDir.'/app/Helper.php', '<?php class Helper {}');
 
         // Test progress during creation
         $creationEvents = [];
@@ -113,8 +113,8 @@ class BaselineDiffScannerTest extends TestCase
         $this->assertNotEmpty($creationEvents);
         $this->assertEquals('start', $creationEvents[0][0]);
         $this->assertEquals(2, $creationEvents[0][1]['total']);
-        
-        $advanceEvents = array_filter($creationEvents, fn($e) => $e[0] === 'advance');
+
+        $advanceEvents = array_filter($creationEvents, fn ($e) => $e[0] === 'advance');
         $this->assertCount(2, $advanceEvents);
 
         $finishEvent = end($creationEvents);
@@ -132,7 +132,7 @@ class BaselineDiffScannerTest extends TestCase
         $this->assertEquals('start', $scanEvents[0][0]);
         $this->assertEquals(2, $scanEvents[0][1]['total']);
 
-        $scanAdvanceEvents = array_filter($scanEvents, fn($e) => $e[0] === 'advance');
+        $scanAdvanceEvents = array_filter($scanEvents, fn ($e) => $e[0] === 'advance');
         $this->assertCount(2, $scanAdvanceEvents);
 
         $scanFinishEvent = end($scanEvents);
@@ -141,13 +141,13 @@ class BaselineDiffScannerTest extends TestCase
 
     public function test_handles_broken_symlinks_safely(): void
     {
-        $scanner = new BaselineDiffScanner();
+        $scanner = new BaselineDiffScanner;
 
-        @mkdir($this->tempDir . '/app', 0777, true);
-        file_put_contents($this->tempDir . '/app/User.php', '<?php class User {}');
+        @mkdir($this->tempDir.'/app', 0777, true);
+        file_put_contents($this->tempDir.'/app/User.php', '<?php class User {}');
 
         // Create a broken symlink in the project root
-        @symlink($this->tempDir . '/non_existent_file.php', $this->tempDir . '/broken_link.php');
+        @symlink($this->tempDir.'/non_existent_file.php', $this->tempDir.'/broken_link.php');
 
         // 1. Baseline creation should complete without TypeError or failure
         $stats = $scanner->createBaseline($this->tempDir);
@@ -158,15 +158,15 @@ class BaselineDiffScannerTest extends TestCase
         $this->assertCount(0, $findings);
 
         // Clean up symlink specifically
-        @unlink($this->tempDir . '/broken_link.php');
+        @unlink($this->tempDir.'/broken_link.php');
     }
 
     public function test_baseline_fast_scan_avoids_recalculating_hashes_if_mtime_and_size_match(): void
     {
-        $scanner = new BaselineDiffScanner();
+        $scanner = new BaselineDiffScanner;
 
-        @mkdir($this->tempDir . '/app', 0777, true);
-        $file = $this->tempDir . '/app/User.php';
+        @mkdir($this->tempDir.'/app', 0777, true);
+        $file = $this->tempDir.'/app/User.php';
         file_put_contents($file, '<?php class User {}');
 
         // Create baseline
@@ -198,10 +198,10 @@ class BaselineDiffScannerTest extends TestCase
 
     public function test_baseline_recreation_uses_deferred_hashing_when_old_baseline_exists(): void
     {
-        $scanner = new BaselineDiffScanner();
+        $scanner = new BaselineDiffScanner;
 
-        @mkdir($this->tempDir . '/app', 0777, true);
-        $file = $this->tempDir . '/app/User.php';
+        @mkdir($this->tempDir.'/app', 0777, true);
+        $file = $this->tempDir.'/app/User.php';
         file_put_contents($file, '<?php class User {}');
 
         // Create initial baseline

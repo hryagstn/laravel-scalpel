@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 return [
 
     /*
@@ -110,15 +112,21 @@ return [
     */
 
     'obfuscation_patterns' => [
-        'eval_base64_decode'  => true,
-        'eval_gzinflate'      => true,
-        'eval_str_rot13'      => true,
-        'eval_gzuncompress'   => true,
-        'eval_gzdecode'       => true,
-        'assert_dynamic'      => true,
-        'variable_functions'  => true,
-        'preg_replace_e'      => true,
+        'eval_base64_decode' => true,
+        'eval_gzinflate' => true,
+        'eval_str_rot13' => true,
+        'eval_gzuncompress' => true,
+        'eval_gzdecode' => true,
+        'assert_dynamic' => true,
+        'variable_functions' => true,
+        'preg_replace_e' => true,
         'long_encoded_string' => true,
+        'create_function' => true,
+        'file_put_contents_encoded' => true,
+        'superglobal_eval' => true,
+        'chr_chaining' => true,
+        'hex_escape_sequence' => true,
+        'dynamic_include' => true,
     ],
 
     /*
@@ -207,6 +215,18 @@ return [
     */
 
     'baseline_fast_scan' => env('SCALPEL_BASELINE_FAST_SCAN', false),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Assume Production Environment
+    |--------------------------------------------------------------------------
+    |
+    | Force strict production security checks in EnvIntegrityScanner even if
+    | APP_ENV is not explicitly set to production.
+    |
+    */
+
+    'assume_production' => env('SCALPEL_ASSUME_PRODUCTION', false),
 
     /*
     |--------------------------------------------------------------------------

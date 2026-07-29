@@ -54,7 +54,7 @@ class HtaccessScanner extends BaseScanner
 
     public function scan(string $basePath): FindingCollection
     {
-        $findings = new FindingCollection();
+        $findings = new FindingCollection;
         $excludedPaths = $this->getExcludedPaths();
 
         // Use a dedicated Finder for .htaccess files.
@@ -77,8 +77,7 @@ class HtaccessScanner extends BaseScanner
      * Uses RecursiveDirectoryIterator directly to avoid dot-file issues with
      * Symfony Finder across different configurations.
      *
-     * @param string   $basePath
-     * @param string[] $excludedPaths
+     * @param  string[]  $excludedPaths
      * @return string[]
      */
     private function findHtaccessFiles(string $basePath, array $excludedPaths): array
@@ -193,6 +192,7 @@ class HtaccessScanner extends BaseScanner
                     description: "Dangerous AddHandler/SetHandler directive '{$handler}' — could allow execution of uploaded scripts.",
                     scanner_name: $this->name(),
                 ));
+
                 return;
             }
         }
@@ -208,6 +208,7 @@ class HtaccessScanner extends BaseScanner
                     description: "AddHandler/SetHandler uses script handler '{$handler}' — could allow execution of non-standard file types as scripts.",
                     scanner_name: $this->name(),
                 ));
+
                 return;
             }
         }
@@ -250,6 +251,7 @@ class HtaccessScanner extends BaseScanner
                     description: "AddType maps '{$extensions}' to script handler '{$mimeType}' — may enable code execution via non-standard file extensions.",
                     scanner_name: $this->name(),
                 ));
+
                 return;
             }
         }
@@ -293,7 +295,6 @@ class HtaccessScanner extends BaseScanner
                 'display_errors',
                 'enable_dl' => in_array($value, ['on', '1', 'true', 'yes'], true),
                 'disable_functions' => $value === '' || $value === 'none',
-                default => false,
             };
 
             if ($isDangerous) {

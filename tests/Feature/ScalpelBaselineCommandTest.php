@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Hryagstn\Scalpel\Tests\Feature;
 
 use Hryagstn\Scalpel\Tests\TestCase;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Storage;
 
 class ScalpelBaselineCommandTest extends TestCase
@@ -65,10 +66,10 @@ class ScalpelBaselineCommandTest extends TestCase
     {
         Storage::assertMissing('scalpel/baseline.json');
 
-        $exitCode = \Illuminate\Support\Facades\Artisan::call('scalpel:baseline', ['--no-banner' => true]);
+        $exitCode = Artisan::call('scalpel:baseline', ['--no-banner' => true]);
         $this->assertSame(0, $exitCode);
 
-        $output = \Illuminate\Support\Facades\Artisan::output();
+        $output = Artisan::output();
         $this->assertStringNotContainsString('Laravel Scalpel', $output);
         $this->assertStringContainsString('Creating baseline snapshot', $output);
     }
@@ -77,10 +78,10 @@ class ScalpelBaselineCommandTest extends TestCase
     {
         Storage::assertMissing('scalpel/baseline.json');
 
-        $exitCode = \Illuminate\Support\Facades\Artisan::call('scalpel:baseline', ['--no-ansi' => true]);
+        $exitCode = Artisan::call('scalpel:baseline', ['--no-ansi' => true]);
         $this->assertSame(0, $exitCode);
 
-        $output = \Illuminate\Support\Facades\Artisan::output();
+        $output = Artisan::output();
         $this->assertStringNotContainsString('Laravel Scalpel', $output);
         $this->assertStringContainsString('Creating baseline snapshot', $output);
     }
@@ -90,10 +91,10 @@ class ScalpelBaselineCommandTest extends TestCase
         config(['scalpel.suppress_banner' => true]);
         Storage::assertMissing('scalpel/baseline.json');
 
-        $exitCode = \Illuminate\Support\Facades\Artisan::call('scalpel:baseline');
+        $exitCode = Artisan::call('scalpel:baseline');
         $this->assertSame(0, $exitCode);
 
-        $output = \Illuminate\Support\Facades\Artisan::output();
+        $output = Artisan::output();
         $this->assertStringNotContainsString('Laravel Scalpel', $output);
         $this->assertStringContainsString('Creating baseline snapshot', $output);
     }
@@ -101,7 +102,7 @@ class ScalpelBaselineCommandTest extends TestCase
     public function test_baseline_command_fast_option_sets_config(): void
     {
         Storage::assertMissing('scalpel/baseline.json');
-        
+
         $this->assertFalse(config('scalpel.baseline_fast_scan', false));
 
         $this->artisan('scalpel:baseline --fast')
@@ -111,4 +112,3 @@ class ScalpelBaselineCommandTest extends TestCase
         $this->assertTrue(config('scalpel.baseline_fast_scan'));
     }
 }
-

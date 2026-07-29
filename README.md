@@ -50,7 +50,7 @@ php artisan vendor:publish --tag=scalpel-config
 
 This creates `config/scalpel.php` where you can customize scan behavior, exclusion lists, and severity thresholds.
 
-> **Requirements:** PHP 8.1+ · Laravel 10.x, 11.x, 12.x, or 13.x
+> **Requirements:** PHP 8.2+ · Laravel 10.x, 11.x, 12.x, or 13.x
 
 ---
 

@@ -25,12 +25,12 @@ class BaselineDiffScanner extends BaseScanner
      * vendor/ and other directories skipped by content scanners are still
      * hashed here so that unauthorized modifications can be detected.
      *
-     * @param string $basePath The root directory of the Laravel project.
+     * @param  string  $basePath  The root directory of the Laravel project.
      * @return array{files: int, size: int, created_at: string}
      */
     public function createBaseline(string $basePath): array
     {
-        $basePath      = rtrim($basePath, '/');
+        $basePath = rtrim($basePath, '/');
         $excludedPaths = $this->getBaselineExcludedPaths();
 
         $finder = $this->createBaselineFinder($basePath, $excludedPaths);
@@ -42,9 +42,9 @@ class BaselineDiffScanner extends BaseScanner
 
         // Load existing baseline to reuse unchanged file hashes (Deferred Hashing)
         $oldBaseline = $this->baselineExists() ? $this->loadBaseline() : null;
-        $oldFiles    = $oldBaseline['files'] ?? [];
+        $oldFiles = $oldBaseline['files'] ?? [];
 
-        $snapshot  = [];
+        $snapshot = [];
         $totalSize = 0;
         $processed = 0;
 
@@ -60,12 +60,16 @@ class BaselineDiffScanner extends BaseScanner
                 continue;
             }
 
-            $fileSize   = $file->getSize();
-            $totalSize += $fileSize;
+            $fileSize = $file->getSize();
             $modifiedAt = $file->getMTime();
-            $hash       = null;
+            if ($fileSize === false || $modifiedAt === false) {
+                continue;
+            }
 
-            if (! empty($oldFiles) && isset($oldFiles[$relativePath]) && config('scalpel.baseline_fast_scan', true)) {
+            $totalSize += $fileSize;
+            $hash = null;
+
+            if (! empty($oldFiles) && isset($oldFiles[$relativePath]) && (bool) config('scalpel.baseline_fast_scan', true)) {
                 $oldFile = $oldFiles[$relativePath];
                 if ($oldFile['size'] === $fileSize && $oldFile['modified_at'] === $modifiedAt) {
                     $hash = $oldFile['hash'];
@@ -73,12 +77,16 @@ class BaselineDiffScanner extends BaseScanner
             }
 
             if ($hash === null) {
-                $hash = hash_file('sha256', $realPath);
+                $computedHash = hash_file('sha256', $realPath);
+                if ($computedHash === false) {
+                    continue;
+                }
+                $hash = $computedHash;
             }
 
             $snapshot[$relativePath] = [
-                'hash'        => $hash,
-                'size'        => $fileSize,
+                'hash' => $hash,
+                'size' => $fileSize,
                 'modified_at' => $modifiedAt,
             ];
 
@@ -94,18 +102,18 @@ class BaselineDiffScanner extends BaseScanner
 
         $baselineData = [
             'created_at' => date('c'),
-            'base_path'  => $basePath,
-            'files'      => $snapshot,
+            'base_path' => $basePath,
+            'files' => $snapshot,
         ];
 
-        Storage::put(
-            $this->getBaselinePath(),
-            json_encode($baselineData, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES),
-        );
+        $json = json_encode($baselineData, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        if ($json !== false) {
+            Storage::put($this->getBaselinePath(), $json);
+        }
 
         return [
-            'files'      => count($snapshot),
-            'size'       => $totalSize,
+            'files' => count($snapshot),
+            'size' => $totalSize,
             'created_at' => $baselineData['created_at'],
         ];
     }
@@ -131,7 +139,7 @@ class BaselineDiffScanner extends BaseScanner
 
     public function scan(string $basePath): FindingCollection
     {
-        $findings = new FindingCollection();
+        $findings = new FindingCollection;
         $basePath = rtrim($basePath, '/');
 
         if (! $this->baselineExists()) {
@@ -163,7 +171,7 @@ class BaselineDiffScanner extends BaseScanner
         /** @var array<string, array{hash: string, size: int, modified_at: int}> $baselineFiles */
         $baselineFiles = $baseline['files'] ?? [];
         $excludedPaths = $this->getBaselineExcludedPaths();
-        $currentFiles  = $this->buildCurrentFileMap($basePath, $excludedPaths, $baselineFiles);
+        $currentFiles = $this->buildCurrentFileMap($basePath, $excludedPaths, $baselineFiles);
 
         // Check for NEW and MODIFIED files
         foreach ($currentFiles as $relativePath => $fileData) {
@@ -175,6 +183,7 @@ class BaselineDiffScanner extends BaseScanner
                     description: 'New file detected that was not in the baseline snapshot.',
                     scanner_name: $this->name(),
                 ));
+
                 continue;
             }
 
@@ -234,23 +243,22 @@ class BaselineDiffScanner extends BaseScanner
      * Applies the same directory-vs-file exclusion logic as BaseScanner::createFinder()
      * but uses baseline-specific excluded paths instead of content scan paths.
      *
-     * @param string   $basePath
-     * @param string[] $excludedPaths
+     * @param  string[]  $excludedPaths
      */
     private function createBaselineFinder(string $basePath, array $excludedPaths): Finder
     {
-        $finder = new Finder();
+        $finder = new Finder;
         $finder->in($basePath)
-               ->files()
-               ->ignoreDotFiles(false)
-               ->ignoreVCS(true);
+            ->files()
+            ->ignoreDotFiles(false)
+            ->ignoreVCS(true);
 
-        $excludedDirs  = [];
+        $excludedDirs = [];
         $excludedFiles = [];
 
         foreach ($excludedPaths as $excluded) {
             $excluded = rtrim($excluded, '/');
-            $fullPath = rtrim($basePath, '/') . '/' . $excluded;
+            $fullPath = rtrim($basePath, '/').'/'.$excluded;
 
             if (is_dir($fullPath)) {
                 $excludedDirs[] = $excluded;
@@ -296,9 +304,8 @@ class BaselineDiffScanner extends BaseScanner
     /**
      * Build a map of current files with their hashes.
      *
-     * @param string   $basePath
-     * @param string[] $excludedPaths
-     * @param array<string, array{hash: string, size: int, modified_at: int}>|null $baselineFiles
+     * @param  string[]  $excludedPaths
+     * @param  array<string, array{hash: string, size: int, modified_at: int}>|null  $baselineFiles
      * @return array<string, array{hash: string, size: int, modified_at: int}>
      */
     private function buildCurrentFileMap(string $basePath, array $excludedPaths, ?array $baselineFiles = null): array
@@ -310,7 +317,7 @@ class BaselineDiffScanner extends BaseScanner
         $totalFiles = count($filesArray);
         $this->notifyProgress('start', ['total' => $totalFiles]);
 
-        $files  = [];
+        $files = [];
         $processed = 0;
 
         foreach ($filesArray as $file) {
@@ -325,11 +332,15 @@ class BaselineDiffScanner extends BaseScanner
                 continue;
             }
 
-            $fileSize   = $file->getSize();
+            $fileSize = $file->getSize();
             $modifiedAt = $file->getMTime();
-            $hash       = null;
+            if ($fileSize === false || $modifiedAt === false) {
+                continue;
+            }
 
-            if ($baselineFiles !== null && isset($baselineFiles[$relativePath]) && config('scalpel.baseline_fast_scan', true)) {
+            $hash = null;
+
+            if ($baselineFiles !== null && isset($baselineFiles[$relativePath]) && (bool) config('scalpel.baseline_fast_scan', true)) {
                 $baselineFile = $baselineFiles[$relativePath];
                 if ($baselineFile['size'] === $fileSize && $baselineFile['modified_at'] === $modifiedAt) {
                     $hash = $baselineFile['hash'];
@@ -337,12 +348,16 @@ class BaselineDiffScanner extends BaseScanner
             }
 
             if ($hash === null) {
-                $hash = hash_file('sha256', $realPath);
+                $computedHash = hash_file('sha256', $realPath);
+                if ($computedHash === false) {
+                    continue;
+                }
+                $hash = $computedHash;
             }
 
             $files[$relativePath] = [
-                'hash'        => $hash,
-                'size'        => $fileSize,
+                'hash' => $hash,
+                'size' => $fileSize,
                 'modified_at' => $modifiedAt,
             ];
 

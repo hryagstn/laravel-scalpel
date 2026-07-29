@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Hryagstn\Scalpel\Tests\Unit;
 
-use Hryagstn\Scalpel\Tests\TestCase;
-use Hryagstn\Scalpel\Scanners\ObfuscatedCodeScanner;
 use Hryagstn\Scalpel\Scanners\BaselineDiffScanner;
+use Hryagstn\Scalpel\Scanners\ObfuscatedCodeScanner;
+use Hryagstn\Scalpel\Tests\TestCase;
 
 class BaseScannerExclusionTest extends TestCase
 {
@@ -16,7 +16,7 @@ class BaseScannerExclusionTest extends TestCase
     {
         parent::setUp();
 
-        $this->sandboxDir = $this->tempDir . '/exclusion_test';
+        $this->sandboxDir = $this->tempDir.'/exclusion_test';
         mkdir($this->sandboxDir, 0777, true);
 
         // Config reflects the new three-tier structure
@@ -33,8 +33,8 @@ class BaseScannerExclusionTest extends TestCase
                 'storage/logs',
                 'storage/framework/cache',
             ],
-            'scalpel.baseline_path'           => 'scalpel/baseline.json',
-            'scalpel.obfuscation_patterns'    => [
+            'scalpel.baseline_path' => 'scalpel/baseline.json',
+            'scalpel.obfuscation_patterns' => [
                 'eval_base64_decode' => true,
             ],
         ]);
@@ -49,9 +49,10 @@ class BaseScannerExclusionTest extends TestCase
 
     private function makeFile(string $relativePath, string $content): string
     {
-        $fullPath = $this->sandboxDir . '/' . ltrim($relativePath, '/');
+        $fullPath = $this->sandboxDir.'/'.ltrim($relativePath, '/');
         @mkdir(dirname($fullPath), 0777, true);
         file_put_contents($fullPath, $content);
+
         return $fullPath;
     }
 
@@ -73,7 +74,7 @@ class BaseScannerExclusionTest extends TestCase
             '<?php eval(base64_decode("dGVzdA==")); ?>'
         );
 
-        $scanner  = new ObfuscatedCodeScanner();
+        $scanner = new ObfuscatedCodeScanner;
         $findings = $scanner->scan($this->sandboxDir);
 
         $files = array_map(fn ($f) => $f->file, $findings->all());
@@ -92,7 +93,7 @@ class BaseScannerExclusionTest extends TestCase
             '<?php eval(base64_decode("dGVzdA==")); ?>'
         );
 
-        $scanner  = new ObfuscatedCodeScanner();
+        $scanner = new ObfuscatedCodeScanner;
         $findings = $scanner->scan($this->sandboxDir);
 
         $files = array_map(fn ($f) => $f->file, $findings->all());
@@ -108,7 +109,7 @@ class BaseScannerExclusionTest extends TestCase
             '<?php eval(base64_decode("dGVzdA==")); ?>'
         );
 
-        $scanner  = new ObfuscatedCodeScanner();
+        $scanner = new ObfuscatedCodeScanner;
         $findings = $scanner->scan($this->sandboxDir);
 
         $files = array_map(fn ($f) => $f->file, $findings->all());
@@ -127,8 +128,8 @@ class BaseScannerExclusionTest extends TestCase
         $this->makeFile('vendor/laravel/framework/src/Request.php', '<?php // legit');
         $this->makeFile('app/Http/Controllers/HomeController.php', '<?php // legit');
 
-        $scanner = new BaselineDiffScanner();
-        $result  = $scanner->createBaseline($this->sandboxDir);
+        $scanner = new BaselineDiffScanner;
+        $result = $scanner->createBaseline($this->sandboxDir);
 
         // Both files should be in the baseline
         $this->assertGreaterThanOrEqual(2, $result['files'],
@@ -141,7 +142,7 @@ class BaseScannerExclusionTest extends TestCase
         $this->makeFile('app/Http/Controllers/HomeController.php', '<?php // legit');
         $this->makeFile('vendor/laravel/framework/src/Request.php', '<?php // legit');
 
-        $scanner = new BaselineDiffScanner();
+        $scanner = new BaselineDiffScanner;
         $scanner->createBaseline($this->sandboxDir);
 
         // Plant a new file in vendor/ after baseline
@@ -163,7 +164,7 @@ class BaseScannerExclusionTest extends TestCase
             '<?php // original content'
         );
 
-        $scanner = new BaselineDiffScanner();
+        $scanner = new BaselineDiffScanner;
         $scanner->createBaseline($this->sandboxDir);
 
         // Modify the vendor file after baseline
@@ -187,8 +188,8 @@ class BaseScannerExclusionTest extends TestCase
         $this->makeFile('storage/logs/laravel.log', 'some log content');
         $this->makeFile('app/Console/Kernel.php', '<?php // legit');
 
-        $scanner = new BaselineDiffScanner();
-        $result  = $scanner->createBaseline($this->sandboxDir);
+        $scanner = new BaselineDiffScanner;
+        $result = $scanner->createBaseline($this->sandboxDir);
 
         // storage/logs should not be in baseline — only app/ file
         $this->assertEquals(1, $result['files'],
@@ -203,8 +204,8 @@ class BaseScannerExclusionTest extends TestCase
     {
         $this->makeFile('bootstrap/cache/services.php', '<?php return [];');
 
-        $scanner = new BaselineDiffScanner();
-        $result  = $scanner->createBaseline($this->sandboxDir);
+        $scanner = new BaselineDiffScanner;
+        $result = $scanner->createBaseline($this->sandboxDir);
 
         $this->assertGreaterThanOrEqual(1, $result['files'],
             'bootstrap/cache/ should be included in baseline for security monitoring');
@@ -217,14 +218,14 @@ class BaseScannerExclusionTest extends TestCase
             '<?php return [];'
         );
 
-        $scanner = new BaselineDiffScanner();
-        $result  = $scanner->createBaseline($this->sandboxDir);
+        $scanner = new BaselineDiffScanner;
+        $result = $scanner->createBaseline($this->sandboxDir);
 
         sleep(1);
         file_put_contents($cacheFile, '<?php /* injected */ return [];');
 
         $findings = $scanner->scan($this->sandboxDir);
-        $files    = array_map(fn ($f) => $f->file, $findings->all());
+        $files = array_map(fn ($f) => $f->file, $findings->all());
 
         $this->assertContains('bootstrap/cache/services.php', $files);
     }
@@ -235,7 +236,7 @@ class BaseScannerExclusionTest extends TestCase
 
     public function test_is_excluded_matches_exact_path(): void
     {
-        $scanner = new ObfuscatedCodeScanner();
+        $scanner = new ObfuscatedCodeScanner;
 
         $reflection = new \ReflectionMethod($scanner, 'isExcluded');
         $reflection->setAccessible(true);
@@ -248,7 +249,7 @@ class BaseScannerExclusionTest extends TestCase
 
     public function test_is_excluded_matches_subdirectory(): void
     {
-        $scanner = new ObfuscatedCodeScanner();
+        $scanner = new ObfuscatedCodeScanner;
 
         $reflection = new \ReflectionMethod($scanner, 'isExcluded');
         $reflection->setAccessible(true);
@@ -261,7 +262,7 @@ class BaseScannerExclusionTest extends TestCase
 
     public function test_is_excluded_does_not_match_partial_names(): void
     {
-        $scanner = new ObfuscatedCodeScanner();
+        $scanner = new ObfuscatedCodeScanner;
 
         $reflection = new \ReflectionMethod($scanner, 'isExcluded');
         $reflection->setAccessible(true);

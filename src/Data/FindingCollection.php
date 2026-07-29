@@ -18,7 +18,7 @@ final class FindingCollection implements Countable, IteratorAggregate
     private array $findings = [];
 
     /**
-     * @param Finding[] $findings
+     * @param  Finding[]  $findings
      */
     public function __construct(array $findings = [])
     {

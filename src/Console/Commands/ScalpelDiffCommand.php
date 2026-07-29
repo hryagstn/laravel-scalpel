@@ -4,15 +4,19 @@ declare(strict_types=1);
 
 namespace Hryagstn\Scalpel\Console\Commands;
 
-use Hryagstn\Scalpel\Data\Finding;
-use Hryagstn\Scalpel\Data\FindingCollection;
-use Hryagstn\Scalpel\Data\Severity;
+use Hryagstn\Scalpel\Console\Concerns\HasBanner;
+use Hryagstn\Scalpel\Console\Concerns\HasScannerProgress;
+use Hryagstn\Scalpel\Console\Concerns\OutputsFindings;
 use Hryagstn\Scalpel\Scalpel;
 use Hryagstn\Scalpel\Scanners\BaselineDiffScanner;
 use Illuminate\Console\Command;
 
 final class ScalpelDiffCommand extends Command
 {
+    use HasBanner;
+    use HasScannerProgress;
+    use OutputsFindings;
+
     /**
      * The name and signature of the console command.
      *
@@ -40,10 +44,7 @@ final class ScalpelDiffCommand extends Command
         }
 
         if (! $this->shouldSuppressBanner()) {
-            $version = ltrim(Scalpel::version(), 'v');
-            $this->newLine();
-            $this->line("  🔬 <fg=cyan;options=bold>Laravel Scalpel</> v{$version} — Baseline Diff");
-            $this->newLine();
+            $this->displayBanner('Baseline Diff');
         }
 
         $scanner = $scalpel->getScanner('Baseline Diff');
@@ -63,130 +64,26 @@ final class ScalpelDiffCommand extends Command
             return 1;
         }
 
-        /** @var string $format */
-        $format = $this->option('format');
+        $formatOption = $this->option('format');
+        $format = is_string($formatOption) ? $formatOption : 'table';
 
         if ($format !== 'json') {
             $this->info('  ▸ Comparing filesystem against baseline...');
             $this->newLine();
-
-            $progressBar = null;
-            $scanner->setProgressCallback(function (string $event, array $data) use (&$progressBar) {
-                if ($event === 'start') {
-                    $progressBar = $this->output->createProgressBar($data['total']);
-                    $progressBar->setFormat('  %current%/%max% [%bar%] %percent:3s%% -- %message%');
-                    $progressBar->setMessage('Scanning files...');
-                    $progressBar->start();
-                } elseif ($event === 'advance' && $progressBar) {
-                    $message = $data['file'];
-                    if (strlen($message) > 40) {
-                        $message = '...' . substr($message, -37);
-                    }
-                    $progressBar->setMessage($message);
-                    $progressBar->advance();
-                } elseif ($event === 'finish' && $progressBar) {
-                    $progressBar->setMessage('Complete!');
-                    $progressBar->finish();
-                    $this->newLine();
-                    $this->newLine();
-                }
-            });
         }
 
         $basePath = (string) base_path();
-        $findings = $scanner->scan($basePath);
+        $findings = $this->runScannerWithProgress($scanner, $basePath, $format);
 
-        if ($format !== 'json') {
-            $scanner->setProgressCallback(null);
-        }
+        // Apply severity threshold from config
+        $findings = $this->applySeverityThreshold($findings);
 
         if ($format === 'json') {
             $this->outputJson($findings);
         } else {
-            $this->outputTable($findings);
+            $this->outputTable($findings, '✅ No changes detected. Filesystem matches the baseline.');
         }
 
         return $findings->hasCriticalOrHigh() ? 1 : 0;
-    }
-
-    /**
-     * Determine if the banner/header should be suppressed.
-     */
-    private function shouldSuppressBanner(): bool
-    {
-        return $this->option('format') === 'json'
-            || ($this->hasOption('no-ansi') && $this->option('no-ansi'))
-            || $this->option('no-banner')
-            || config('scalpel.suppress_banner', false);
-    }
-
-    /**
-     * Output findings as JSON.
-     */
-    private function outputJson(FindingCollection $findings): void
-    {
-        $this->line((string) json_encode([
-            'total'    => $findings->count(),
-            'findings' => $findings->toArray(),
-        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
-    }
-
-    /**
-     * Output findings as formatted tables grouped by severity.
-     */
-    private function outputTable(FindingCollection $findings): void
-    {
-        if ($findings->isEmpty()) {
-            $this->info('  ✅ No changes detected. Filesystem matches the baseline.');
-            $this->newLine();
-
-            return;
-        }
-
-        // Group findings by severity: CRITICAL first, then HIGH, MEDIUM, LOW
-        $grouped = $findings->groupBySeverity();
-        $severityOrder = [
-            Severity::CRITICAL->value,
-            Severity::HIGH->value,
-            Severity::MEDIUM->value,
-            Severity::LOW->value,
-        ];
-
-        foreach ($severityOrder as $severityValue) {
-            if (! isset($grouped[$severityValue])) {
-                continue;
-            }
-
-            $severityFindings = $grouped[$severityValue];
-            $severity = Severity::from($severityValue);
-
-            $this->line("  <fg={$severity->color()};options=bold>{$severity->badge()}</> (" . count($severityFindings) . ' findings)');
-
-            $rows = [];
-            foreach ($severityFindings as $finding) {
-                $rows[] = [
-                    $finding->severity->badge(),
-                    $finding->file,
-                    $finding->line !== null ? (string) $finding->line : '-',
-                    $finding->description,
-                ];
-            }
-
-            $this->table(
-                ['Severity', 'File', 'Line', 'Description'],
-                $rows,
-            );
-
-            $this->newLine();
-        }
-
-        // Summary
-        $this->line("  <fg=white;options=bold>Total changes detected: {$findings->count()}</>");
-
-        if ($findings->hasCriticalOrHigh()) {
-            $this->line('  <fg=red;options=bold>⚠  CRITICAL or HIGH severity changes detected. Investigate immediately!</>');
-        }
-
-        $this->newLine();
     }
 }

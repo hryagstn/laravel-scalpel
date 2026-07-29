@@ -31,7 +31,7 @@ class ObfuscatedCodeScanner extends BaseScanner
 
     public function scan(string $basePath): FindingCollection
     {
-        $findings = new FindingCollection();
+        $findings = new FindingCollection;
         $patterns = $this->getEnabledPatterns();
 
         if (empty($patterns)) {
@@ -56,10 +56,7 @@ class ObfuscatedCodeScanner extends BaseScanner
     /**
      * Scan a single file line by line for obfuscation patterns.
      *
-     * @param string $filePath
-     * @param string $relativePath
-     * @param array<string, array{pattern: string, severity: Severity, description: string}> $patterns
-     * @param FindingCollection $findings
+     * @param  array<string, array{pattern: string, severity: Severity, description: string}>  $patterns
      */
     private function scanFile(
         string $filePath,
@@ -85,18 +82,24 @@ class ObfuscatedCodeScanner extends BaseScanner
 
                 foreach ($patterns as $key => $patternDef) {
                     if ($key === 'long_encoded_string') {
-                        // Handle long encoded string detection separately
                         $this->checkLongEncodedString($line, $lineNumber, $relativePath, $findings);
+
                         continue;
                     }
 
                     if ($key === 'variable_functions') {
-                        // Handle variable function detection separately
                         $this->checkVariableFunctions($line, $lineNumber, $relativePath, $findings);
+
                         continue;
                     }
 
-                    if (preg_match($patternDef['pattern'], $line) === 1) {
+                    if ($key === 'chr_chaining') {
+                        $this->checkChrChaining($line, $lineNumber, $relativePath, $findings);
+
+                        continue;
+                    }
+
+                    if (! empty($patternDef['pattern']) && preg_match($patternDef['pattern'], $line) === 1) {
                         $findings->add(Finding::make(
                             severity: $patternDef['severity'],
                             file: $relativePath,
@@ -114,10 +117,6 @@ class ObfuscatedCodeScanner extends BaseScanner
 
     /**
      * Check for variable function calls that invoke dangerous functions.
-     *
-     * Detects patterns like:
-     *   $var = 'system'; $var('command');
-     *   $func = "exec"; $func($arg);
      */
     private function checkVariableFunctions(
         string $line,
@@ -125,9 +124,8 @@ class ObfuscatedCodeScanner extends BaseScanner
         string $relativePath,
         FindingCollection $findings,
     ): void {
-        // Check for assignment of dangerous function names to variables
         $dangerousFuncList = implode('|', self::DANGEROUS_FUNCTIONS);
-        $assignmentPattern = '/\$[a-zA-Z_]\w*\s*=\s*[\'"](' . $dangerousFuncList . ')[\'"]/i';
+        $assignmentPattern = '/\$[a-zA-Z_]\w*\s*=\s*[\'"]('.$dangerousFuncList.')[\'"]/i';
 
         if (preg_match($assignmentPattern, $line) === 1) {
             $findings->add(Finding::make(
@@ -137,11 +135,10 @@ class ObfuscatedCodeScanner extends BaseScanner
                 description: 'Variable assigned a dangerous function name — potential variable function call to evade detection.',
                 scanner_name: $this->name(),
             ));
+
             return;
         }
 
-        // Check for variable function invocation pattern: $var(...)
-        // Only flag if the line also contains one of the dangerous function names as a string
         if (preg_match('/\$[a-zA-Z_]\w*\s*\(/', $line) === 1) {
             foreach (self::DANGEROUS_FUNCTIONS as $func) {
                 if (str_contains($line, "'{$func}'") || str_contains($line, "\"{$func}\"")) {
@@ -152,9 +149,31 @@ class ObfuscatedCodeScanner extends BaseScanner
                         description: "Variable function call detected with dangerous function '{$func}'.",
                         scanner_name: $this->name(),
                     ));
+
                     return;
                 }
             }
+        }
+    }
+
+    /**
+     * Check for excessive chr() chaining used to obfuscate code strings.
+     */
+    private function checkChrChaining(
+        string $line,
+        int $lineNumber,
+        string $relativePath,
+        FindingCollection $findings,
+    ): void {
+        $count = preg_match_all('/chr\s*\(\s*\d+\s*\)/i', $line);
+        if ($count !== false && $count >= 10) {
+            $findings->add(Finding::make(
+                severity: Severity::MEDIUM,
+                file: $relativePath,
+                line: $lineNumber,
+                description: sprintf('Excessive chr() function chaining detected (%d calls in one line) — common obfuscation technique.', $count),
+                scanner_name: $this->name(),
+            ));
         }
     }
 
@@ -170,8 +189,7 @@ class ObfuscatedCodeScanner extends BaseScanner
         /** @var int $threshold */
         $threshold = config('scalpel.long_string_threshold', 500);
 
-        // Extract string literals from the line
-        if (preg_match_all('/[\'"]([^\'"]{' . $threshold . ',})[\'"]/', $line, $matches)) {
+        if (preg_match_all('/[\'"]([^\'"]{'.$threshold.',})[\'"]/', $line, $matches)) {
             foreach ($matches[1] as $stringContent) {
                 if ($this->looksEncoded($stringContent)) {
                     $findings->add(Finding::make(
@@ -188,8 +206,6 @@ class ObfuscatedCodeScanner extends BaseScanner
             }
         }
 
-        // Also check for long non-whitespace sequences outside of strings
-        // (e.g. concatenated or heredoc payloads)
         $trimmedLine = trim($line);
         if (strlen($trimmedLine) > $threshold) {
             $nonSpaceRatio = 1 - (substr_count($trimmedLine, ' ') / strlen($trimmedLine));
@@ -216,12 +232,10 @@ class ObfuscatedCodeScanner extends BaseScanner
     {
         $trimmed = ltrim($line);
 
-        // Check for single-line comments (// or #)
         if (str_starts_with($trimmed, '//') || str_starts_with($trimmed, '#')) {
             return true;
         }
 
-        // Check for multi-line comment starts (/*) or continuation lines within comments (*)
         if (str_starts_with($trimmed, '/*') || str_starts_with($trimmed, '*')) {
             return true;
         }
@@ -234,19 +248,16 @@ class ObfuscatedCodeScanner extends BaseScanner
      */
     private function looksEncoded(string $content): bool
     {
-        // Base64 pattern: mostly alphanumeric with +/= characters
         if (preg_match('/^[A-Za-z0-9+\/=]{100,}$/', $content) === 1) {
             return true;
         }
 
-        // Hex pattern: exclusively hex characters
         if (preg_match('/^[0-9a-fA-F]{100,}$/', $content) === 1) {
             return true;
         }
 
-        // High ratio of alphanumeric characters suggests encoding
         $alphanumCount = preg_match_all('/[A-Za-z0-9]/', $content);
-        if ($alphanumCount !== false && strlen($content) > 0) {
+        if (strlen($content) > 0) {
             $ratio = $alphanumCount / strlen($content);
             if ($ratio > 0.85) {
                 return true;
@@ -302,7 +313,36 @@ class ObfuscatedCodeScanner extends BaseScanner
                 'severity' => Severity::HIGH,
                 'description' => 'preg_replace() with /e modifier — evaluates replacement as PHP code (deprecated but dangerous).',
             ],
-            // These two have custom handlers and won't use the 'pattern' key directly
+            'create_function' => [
+                'pattern' => '/create_function\s*\(/i',
+                'severity' => Severity::HIGH,
+                'description' => 'create_function() detected — deprecated function commonly exploited to execute dynamic code.',
+            ],
+            'file_put_contents_encoded' => [
+                'pattern' => '/file_put_contents\s*\(.*(base64_decode|gzinflate|str_rot13)/i',
+                'severity' => Severity::HIGH,
+                'description' => 'file_put_contents() with decoded payload detected — dropper pattern writing malicious files to disk.',
+            ],
+            'superglobal_eval' => [
+                'pattern' => '/\b(eval|system|exec|passthru|shell_exec|assert)\s*\(\s*\$_(GET|POST|REQUEST|COOKIE)/i',
+                'severity' => Severity::CRITICAL,
+                'description' => 'Direct execution of superglobal input ($_GET/$_POST/$_REQUEST) detected — immediate web shell pattern.',
+            ],
+            'hex_escape_sequence' => [
+                'pattern' => '/(\\\\x[0-9a-fA-F]{2}){10,}/i',
+                'severity' => Severity::MEDIUM,
+                'description' => 'Dense hex escape sequences detected — obfuscated binary or code string.',
+            ],
+            'dynamic_include' => [
+                'pattern' => '/(include|require)(_once)?\s*[\(\s]*\$_(GET|POST|REQUEST|COOKIE|SERVER|FILES)/i',
+                'severity' => Severity::CRITICAL,
+                'description' => 'Dynamic file inclusion using superglobal input ($_GET/$_POST/$_REQUEST) — Remote/Local File Inclusion (RFI/LFI) backdoor.',
+            ],
+            'chr_chaining' => [
+                'pattern' => '',
+                'severity' => Severity::MEDIUM,
+                'description' => 'Excessive chr() function chaining detected.',
+            ],
             'variable_functions' => [
                 'pattern' => '',
                 'severity' => Severity::HIGH,
@@ -318,7 +358,6 @@ class ObfuscatedCodeScanner extends BaseScanner
         $enabled = [];
 
         foreach ($allPatterns as $key => $pattern) {
-            // Default to enabled if not explicitly configured
             if (($config[$key] ?? true) === true) {
                 $enabled[$key] = $pattern;
             }

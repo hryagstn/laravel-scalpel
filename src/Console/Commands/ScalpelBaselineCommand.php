@@ -4,12 +4,17 @@ declare(strict_types=1);
 
 namespace Hryagstn\Scalpel\Console\Commands;
 
+use Hryagstn\Scalpel\Console\Concerns\HasBanner;
+use Hryagstn\Scalpel\Console\Concerns\HasScannerProgress;
 use Hryagstn\Scalpel\Scalpel;
 use Hryagstn\Scalpel\Scanners\BaselineDiffScanner;
 use Illuminate\Console\Command;
 
 final class ScalpelBaselineCommand extends Command
 {
+    use HasBanner;
+    use HasScannerProgress;
+
     /**
      * The name and signature of the console command.
      *
@@ -37,10 +42,7 @@ final class ScalpelBaselineCommand extends Command
         }
 
         if (! $this->shouldSuppressBanner()) {
-            $version = ltrim(Scalpel::version(), 'v');
-            $this->newLine();
-            $this->line("  🔬 <fg=cyan;options=bold>Laravel Scalpel</> v{$version} — Baseline Snapshot");
-            $this->newLine();
+            $this->displayBanner('Baseline Snapshot');
         }
 
         $scanner = $scalpel->getScanner('Baseline Diff');
@@ -66,6 +68,8 @@ final class ScalpelBaselineCommand extends Command
 
         $this->info('  ▸ Creating baseline snapshot...');
 
+        $basePath = (string) base_path();
+
         $progressBar = null;
         $scanner->setProgressCallback(function (string $event, array $data) use (&$progressBar) {
             if ($event === 'start') {
@@ -74,9 +78,9 @@ final class ScalpelBaselineCommand extends Command
                 $progressBar->setMessage('Scanning files...');
                 $progressBar->start();
             } elseif ($event === 'advance' && $progressBar) {
-                $message = $data['file'];
+                $message = (string) ($data['file'] ?? '');
                 if (strlen($message) > 40) {
-                    $message = '...' . substr($message, -37);
+                    $message = '...'.substr($message, -37);
                 }
                 $progressBar->setMessage($message);
                 $progressBar->advance();
@@ -87,7 +91,6 @@ final class ScalpelBaselineCommand extends Command
             }
         });
 
-        $basePath = (string) base_path();
         $baseline = $scanner->createBaseline($basePath);
 
         $scanner->setProgressCallback(null);
@@ -98,21 +101,11 @@ final class ScalpelBaselineCommand extends Command
         $baselinePath = config('scalpel.baseline_path', 'scalpel/baseline.json');
 
         $this->newLine();
-        $this->info("  ✅ Baseline created successfully!");
+        $this->info('  ✅ Baseline created successfully!');
         $this->line("  📁 Files indexed: <fg=white;options=bold>{$fileCount}</>");
         $this->line("  💾 Stored at: <fg=gray>storage/app/private/{$baselinePath}</>");
         $this->newLine();
 
         return 0;
-    }
-
-    /**
-     * Determine if the banner/header should be suppressed.
-     */
-    private function shouldSuppressBanner(): bool
-    {
-        return ($this->hasOption('no-ansi') && $this->option('no-ansi'))
-            || $this->option('no-banner')
-            || config('scalpel.suppress_banner', false);
     }
 }

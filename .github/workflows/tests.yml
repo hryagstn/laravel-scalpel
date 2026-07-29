@@ -8,7 +8,6 @@ on:
     branches:
       - main
 
-# Mengaktifkan paksa runtime Node.js 24 untuk semua action JavaScript di dalam workflow ini
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
@@ -20,10 +19,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Laravel 10 — supports PHP 8.1, 8.2, 8.3
-          - php: '8.1'
-            laravel: '^10.0'
-            testbench: '^8.0'
+          # Laravel 10 — supports PHP 8.2, 8.3
           - php: '8.2'
             laravel: '^10.0'
             testbench: '^8.0'
@@ -53,13 +49,23 @@ jobs:
             laravel: '^12.0'
             testbench: '^10.0'
 
+          # Laravel 13 — supports PHP 8.2, 8.3, 8.4
+          - php: '8.2'
+            laravel: '^13.0'
+            testbench: '^10.0'
+          - php: '8.3'
+            laravel: '^13.0'
+            testbench: '^10.0'
+          - php: '8.4'
+            laravel: '^13.0'
+            testbench: '^10.0'
+
     name: PHP ${{ matrix.php }} - Laravel ${{ matrix.laravel }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Mengarahkan environment runner ke Node 24 secara eksplisit
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -100,3 +106,29 @@ jobs:
 
       - name: Execute tests
         run: vendor/bin/phpunit
+
+  phpstan:
+    runs-on: ubuntu-latest
+    name: PHPStan Static Analysis
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: dom, curl, libxml, mbstring, zip
+          coverage: none
+      - run: composer install --no-interaction --prefer-dist
+      - run: vendor/bin/phpstan analyse
+
+  pint:
+    runs-on: ubuntu-latest
+    name: Pint Code Style Check
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: dom, curl, mbstring
+          coverage: none
+      - run: composer install --no-interaction --prefer-dist
+      - run: vendor/bin/pint --test

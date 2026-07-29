@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Hryagstn\Scalpel\Tests\Feature;
 
+use Hryagstn\Scalpel\Scalpel;
 use Hryagstn\Scalpel\Tests\TestCase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Storage;
@@ -19,12 +20,12 @@ class ScalpelVerifyCommandTest extends TestCase
         Storage::fake('local');
 
         config([
-            'scalpel.non_php_zones'               => ['public'],
-            'scalpel.structural_allowed_files'     => ['public/index.php'],
-            'scalpel.excluded_paths'               => ['node_modules', '.git'],
-            'scalpel.content_scan_excluded_paths'  => ['vendor', 'bootstrap/cache'],
-            'scalpel.baseline_excluded_paths'      => ['storage', 'bootstrap'],
-            'scalpel.severity_threshold'           => 'LOW',
+            'scalpel.non_php_zones' => ['public'],
+            'scalpel.structural_allowed_files' => ['public/index.php'],
+            'scalpel.excluded_paths' => ['node_modules', '.git'],
+            'scalpel.content_scan_excluded_paths' => ['vendor', 'bootstrap/cache'],
+            'scalpel.baseline_excluded_paths' => ['storage', 'bootstrap'],
+            'scalpel.severity_threshold' => 'LOW',
         ]);
     }
 
@@ -42,7 +43,7 @@ class ScalpelVerifyCommandTest extends TestCase
     private function createSandboxFile(string $relativePath, string $content): string
     {
         $path = base_path($relativePath);
-        $dir  = dirname($path);
+        $dir = dirname($path);
 
         if (! is_dir($dir)) {
             @mkdir($dir, 0777, true);
@@ -55,16 +56,17 @@ class ScalpelVerifyCommandTest extends TestCase
         }
 
         $this->createdFiles[] = $path;
+
         return $path;
     }
 
     public function test_scan_produces_unsigned_json_when_disabled(): void
     {
-        $this->createSandboxFile('.env', 'APP_ENV=testing');
-        $this->createSandboxFile('.env.example', 'APP_ENV=');
-        
+        $this->createSandboxFile('.env', "APP_ENV=testing\nAPP_KEY=base64:1234567890=");
+        $this->createSandboxFile('.env.example', "APP_ENV=\nAPP_KEY=");
+
         // Ensure baseline diff is clean
-        $scalpel = app(\Hryagstn\Scalpel\Scalpel::class);
+        $scalpel = app(Scalpel::class);
         $scalpel->getScanner('Baseline Diff')->createBaseline(base_path());
 
         config(['scalpel.signing.enabled' => false]);
@@ -74,7 +76,7 @@ class ScalpelVerifyCommandTest extends TestCase
 
         $output = Artisan::output();
         $this->assertStringNotContainsString('"signature"', $output);
-        
+
         $data = json_decode($output, true);
         $this->assertArrayHasKey('total', $data);
         $this->assertArrayHasKey('findings', $data);
@@ -83,11 +85,11 @@ class ScalpelVerifyCommandTest extends TestCase
 
     public function test_scan_produces_signed_json_when_enabled(): void
     {
-        $this->createSandboxFile('.env', 'APP_ENV=testing');
-        $this->createSandboxFile('.env.example', 'APP_ENV=');
-        
+        $this->createSandboxFile('.env', "APP_ENV=testing\nAPP_KEY=base64:1234567890=");
+        $this->createSandboxFile('.env.example', "APP_ENV=\nAPP_KEY=");
+
         // Ensure baseline diff is clean
-        $scalpel = app(\Hryagstn\Scalpel\Scalpel::class);
+        $scalpel = app(Scalpel::class);
         $scalpel->getScanner('Baseline Diff')->createBaseline(base_path());
 
         config([
@@ -116,7 +118,7 @@ class ScalpelVerifyCommandTest extends TestCase
     public function test_scan_throws_exception_when_signing_enabled_but_key_missing(): void
     {
         $this->createSandboxFile('.env', 'APP_ENV=testing');
-        
+
         config([
             'scalpel.signing.enabled' => true,
             'scalpel.signing.key' => null,

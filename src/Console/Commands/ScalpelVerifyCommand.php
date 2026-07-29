@@ -33,26 +33,31 @@ final class ScalpelVerifyCommand extends Command
         if ($file === '-' || $file === null) {
             $jsonContent = @file_get_contents('php://stdin');
         } else {
-            if (!file_exists($file)) {
-                $this->error("  ❌ File not found: {$file}");
+            $filePath = is_string($file) ? $file : '';
+            if ($filePath === '' || ! file_exists($filePath)) {
+                $this->error("  ❌ File not found: {$filePath}");
+
                 return 1;
             }
-            $jsonContent = @file_get_contents($file);
+            $jsonContent = @file_get_contents($filePath);
         }
 
-        if (empty($jsonContent)) {
+        if (! is_string($jsonContent) || trim($jsonContent) === '') {
             $this->error('  ❌ Empty or missing JSON input.');
+
             return 1;
         }
 
         $data = json_decode($jsonContent, true);
-        if (!is_array($data)) {
+        if (! is_array($data)) {
             $this->error('  ❌ Invalid JSON format.');
+
             return 1;
         }
 
-        if (!isset($data['signature'])) {
+        if (! isset($data['signature'])) {
             $this->error('  ❌ Signature missing from JSON payload.');
+
             return 1;
         }
 
@@ -61,10 +66,16 @@ final class ScalpelVerifyCommand extends Command
 
         // Rebuilt canonical JSON structure
         $canonicalJson = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        if ($canonicalJson === false) {
+            $this->error('  ❌ Invalid JSON payload.');
+
+            return 1;
+        }
 
         $key = config('scalpel.signing.key');
         if (empty($key)) {
             $this->error('  ❌ Scalpel signing key is not configured.');
+
             return 1;
         }
 
@@ -72,10 +83,12 @@ final class ScalpelVerifyCommand extends Command
 
         if (hash_equals($expectedSignature, $signature)) {
             $this->info('  ✅ Output integrity verified successfully.');
+
             return 0;
         }
 
         $this->error('  ❌ Signature verification failed. The payload has been tampered with or signed with a different key.');
+
         return 1;
     }
 }

@@ -18,7 +18,7 @@ final class ScalpelServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->mergeConfigFrom(
-            __DIR__ . '/../config/scalpel.php',
+            __DIR__.'/../config/scalpel.php',
             'scalpel',
         );
 
@@ -33,7 +33,7 @@ final class ScalpelServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->publishes([
-            __DIR__ . '/../config/scalpel.php' => config_path('scalpel.php'),
+            __DIR__.'/../config/scalpel.php' => config_path('scalpel.php'),
         ], 'scalpel-config');
 
         if ($this->app->runningInConsole()) {

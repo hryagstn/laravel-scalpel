@@ -12,8 +12,6 @@ abstract class BaseScanner implements ScannerInterface
 {
     /**
      * Progress listener callback.
-     *
-     * @var \Closure|null
      */
     protected ?\Closure $progressCallback = null;
 
@@ -27,6 +25,8 @@ abstract class BaseScanner implements ScannerInterface
 
     /**
      * Notify progress update.
+     *
+     * @param  array<string, mixed>  $data
      */
     protected function notifyProgress(string $event, array $data = []): void
     {
@@ -65,13 +65,15 @@ abstract class BaseScanner implements ScannerInterface
 
     /**
      * Check if a given path should be excluded.
+     *
+     * @param  string[]  $excludedPaths
      */
     protected function isExcluded(string $relativePath, array $excludedPaths): bool
     {
         foreach ($excludedPaths as $excluded) {
             $excluded = rtrim($excluded, '/');
 
-            if ($relativePath === $excluded || str_starts_with($relativePath, $excluded . '/')) {
+            if ($relativePath === $excluded || str_starts_with($relativePath, $excluded.'/')) {
                 return true;
             }
         }
@@ -91,25 +93,24 @@ abstract class BaseScanner implements ScannerInterface
      * By default, uses content_scan_excluded_paths (global + content-scan-specific).
      * Pass a custom list to override.
      *
-     * @param string   $basePath
-     * @param string[] $excludedPaths
+     * @param  string[]  $excludedPaths
      */
     protected function createFinder(string $basePath, ?array $excludedPaths = null): Finder
     {
         $excludedPaths ??= $this->getContentScanExcludedPaths();
 
-        $finder = new Finder();
+        $finder = new Finder;
         $finder->in($basePath)
-               ->files()
-               ->ignoreDotFiles(false)
-               ->ignoreVCS(true);
+            ->files()
+            ->ignoreDotFiles(false)
+            ->ignoreVCS(true);
 
-        $excludedDirs  = [];
+        $excludedDirs = [];
         $excludedFiles = [];
 
         foreach ($excludedPaths as $excluded) {
-            $excluded   = rtrim($excluded, '/');
-            $fullPath   = rtrim($basePath, '/') . '/' . $excluded;
+            $excluded = rtrim($excluded, '/');
+            $fullPath = rtrim($basePath, '/').'/'.$excluded;
 
             if (is_dir($fullPath)) {
                 // Use exclude() to prevent traversal into the directory entirely
@@ -138,7 +139,7 @@ abstract class BaseScanner implements ScannerInterface
     {
         // Normalize separators to forward slash for cross-platform compatibility
         $fullPath = str_replace('\\', '/', $fullPath);
-        $basePath = str_replace('\\', '/', rtrim($basePath, '/\\')) . '/';
+        $basePath = str_replace('\\', '/', rtrim($basePath, '/\\')).'/';
 
         if (str_starts_with($fullPath, $basePath)) {
             return substr($fullPath, strlen($basePath));

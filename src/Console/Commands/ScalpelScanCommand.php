@@ -4,13 +4,19 @@ declare(strict_types=1);
 
 namespace Hryagstn\Scalpel\Console\Commands;
 
+use Hryagstn\Scalpel\Console\Concerns\HasBanner;
+use Hryagstn\Scalpel\Console\Concerns\HasScannerProgress;
+use Hryagstn\Scalpel\Console\Concerns\OutputsFindings;
 use Hryagstn\Scalpel\Data\FindingCollection;
-use Hryagstn\Scalpel\Data\Severity;
 use Hryagstn\Scalpel\Scalpel;
 use Illuminate\Console\Command;
 
 final class ScalpelScanCommand extends Command
 {
+    use HasBanner;
+    use HasScannerProgress;
+    use OutputsFindings;
+
     /**
      * The name and signature of the console command.
      *
@@ -20,7 +26,8 @@ final class ScalpelScanCommand extends Command
         {--only= : Comma-separated list of scanners to run}
         {--format=table : Output format (table or json)}
         {--fast : Enable metadata-based fast scan (deferred hashing)}
-        {--no-banner : Suppress the banner/header}';
+        {--no-banner : Suppress the banner/header}
+        {--production : Force production-level environment security checks}';
 
     /**
      * The console command description.
@@ -35,11 +42,11 @@ final class ScalpelScanCommand extends Command
      * @var array<string, string>
      */
     private const SCANNER_ALIASES = [
-        'structural'  => 'Structural Anomaly',
-        'obfuscated'  => 'Obfuscated Code',
-        'htaccess'    => '.htaccess',
-        'baseline'    => 'Baseline Diff',
-        'env'         => 'Env Integrity',
+        'structural' => 'Structural Anomaly',
+        'obfuscated' => 'Obfuscated Code',
+        'htaccess' => 'Htaccess',
+        'baseline' => 'Baseline Diff',
+        'env' => 'Env Integrity',
     ];
 
     /**
@@ -51,8 +58,12 @@ final class ScalpelScanCommand extends Command
             config(['scalpel.baseline_fast_scan' => true]);
         }
 
+        if ($this->option('production')) {
+            config(['scalpel.assume_production' => true]);
+        }
+
         if (! $this->shouldSuppressBanner()) {
-            $this->displayBanner();
+            $this->displayBanner('Intrusion Evidence Scanner');
         }
 
         $basePath = (string) base_path();
@@ -60,15 +71,15 @@ final class ScalpelScanCommand extends Command
         /** @var string|null $onlyOption */
         $onlyOption = $this->option('only');
 
-        /** @var string $format */
-        $format = $this->option('format');
+        $formatOption = $this->option('format');
+        $format = is_string($formatOption) ? $formatOption : 'table';
 
         // Run scanners
         if ($onlyOption !== null && $onlyOption !== '') {
             $scannerNames = $this->resolveScannerNames($onlyOption);
-            $findings = $this->runSelectedScanners($scalpel, $basePath, $scannerNames);
+            $findings = $this->runSelectedScanners($scalpel, $basePath, $scannerNames, $format);
         } else {
-            $findings = $this->runAllScanners($scalpel, $basePath);
+            $findings = $this->runAllScanners($scalpel, $basePath, $format);
         }
 
         // Apply severity threshold from config
@@ -82,43 +93,6 @@ final class ScalpelScanCommand extends Command
         }
 
         return $findings->hasCriticalOrHigh() ? 1 : 0;
-    }
-
-    /**
-     * Display the package banner.
-     */
-    private function displayBanner(): void
-    {
-        $version = ltrim(Scalpel::version(), 'v');
-        $this->newLine();
-        $this->line('  ╔══════════════════════════════════════════════════╗');
-        $this->line($this->formatBoxLine('  🔬 <fg=cyan;options=bold>Laravel Scalpel</> — Intrusion Evidence Scanner  '));
-        $this->line($this->formatBoxLine("  <fg=gray>v{$version} • Filesystem Security Analysis</>"));
-        $this->line('  ╚══════════════════════════════════════════════════╝');
-        $this->newLine();
-    }
-
-    /**
-     * Determine if the banner/header should be suppressed.
-     */
-    private function shouldSuppressBanner(): bool
-    {
-        return $this->option('format') === 'json'
-            || ($this->hasOption('no-ansi') && $this->option('no-ansi'))
-            || $this->option('no-banner')
-            || config('scalpel.suppress_banner', false);
-    }
-
-    /**
-     * Format a line to fit perfectly inside the banner's double box.
-     */
-    private function formatBoxLine(string $content, int $innerWidth = 50): string
-    {
-        $visibleContent = preg_replace('/<[^>]*>/', '', $content);
-        $visibleLength = mb_strlen($visibleContent ?? '', 'UTF-8');
-        $padLength = max(0, $innerWidth - $visibleLength);
-
-        return "  ║" . $content . str_repeat(' ', $padLength) . "║";
     }
 
     /**
@@ -149,13 +123,12 @@ final class ScalpelScanCommand extends Command
     /**
      * Run all scanners with progress output.
      */
-    private function runAllScanners(Scalpel $scalpel, string $basePath): FindingCollection
+    private function runAllScanners(Scalpel $scalpel, string $basePath, string $format): FindingCollection
     {
-        $collection = new FindingCollection();
-        $format = $this->option('format');
+        $collection = new FindingCollection;
 
         foreach ($scalpel->getScanners() as $scanner) {
-            $collection->merge($this->runScanner($scalpel, $scanner, $basePath, $format));
+            $collection->merge($this->runScannerWithProgress($scanner, $basePath, $format));
         }
 
         if ($format !== 'json') {
@@ -168,16 +141,15 @@ final class ScalpelScanCommand extends Command
     /**
      * Run only selected scanners with progress output.
      *
-     * @param string[] $scannerNames
+     * @param  string[]  $scannerNames
      */
-    private function runSelectedScanners(Scalpel $scalpel, string $basePath, array $scannerNames): FindingCollection
+    private function runSelectedScanners(Scalpel $scalpel, string $basePath, array $scannerNames, string $format): FindingCollection
     {
-        $collection = new FindingCollection();
-        $format = $this->option('format');
+        $collection = new FindingCollection;
 
         foreach ($scalpel->getScanners() as $scanner) {
             if (in_array($scanner->name(), $scannerNames, true)) {
-                $collection->merge($this->runScanner($scalpel, $scanner, $basePath, $format));
+                $collection->merge($this->runScannerWithProgress($scanner, $basePath, $format));
             }
         }
 
@@ -186,159 +158,5 @@ final class ScalpelScanCommand extends Command
         }
 
         return $collection;
-    }
-
-    /**
-     * Run a single scanner, optionally showing progress.
-     */
-    private function runScanner(Scalpel $scalpel, \Hryagstn\Scalpel\Contracts\ScannerInterface $scanner, string $basePath, string $format): FindingCollection
-    {
-        if ($format !== 'json') {
-            $this->info("  ▸ Running scanner: {$scanner->name()}");
-        }
-
-        $hasProgress = $format !== 'json' && $scanner instanceof \Hryagstn\Scalpel\Scanners\BaseScanner;
-        if ($hasProgress) {
-            $progressBar = null;
-            $scanner->setProgressCallback(function (string $event, array $data) use (&$progressBar) {
-                if ($event === 'start') {
-                    $progressBar = $this->output->createProgressBar($data['total']);
-                    $progressBar->setFormat('  %current%/%max% [%bar%] %percent:3s%% -- %message%');
-                    $progressBar->setMessage('Scanning files...');
-                    $progressBar->start();
-                } elseif ($event === 'advance' && $progressBar) {
-                    $message = $data['file'];
-                    if (strlen($message) > 40) {
-                        $message = '...' . substr($message, -37);
-                    }
-                    $progressBar->setMessage($message);
-                    $progressBar->advance();
-                } elseif ($event === 'finish' && $progressBar) {
-                    $progressBar->setMessage('Complete!');
-                    $progressBar->finish();
-                    $this->newLine();
-                }
-            });
-        }
-
-        $findings = $scanner->scan($basePath);
-
-        if ($hasProgress) {
-            $scanner->setProgressCallback(null);
-        }
-
-        return $findings;
-    }
-
-    /**
-     * Apply the configured severity threshold to filter findings.
-     */
-    private function applySeverityThreshold(FindingCollection $findings): FindingCollection
-    {
-        /** @var string $thresholdValue */
-        $thresholdValue = config('scalpel.severity_threshold', 'LOW');
-        $threshold = Severity::tryFrom($thresholdValue);
-
-        if ($threshold === null) {
-            return $findings;
-        }
-
-        return $findings->filterBySeverity($threshold);
-    }
-
-    /**
-     * Output findings as JSON.
-     */
-    private function outputJson(FindingCollection $findings): void
-    {
-        $payload = [
-            'total'    => $findings->count(),
-            'findings' => $findings->toArray(),
-        ];
-
-        $json = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-
-        if (config('scalpel.signing.enabled', false)) {
-            $key = config('scalpel.signing.key');
-            if (empty($key)) {
-                throw new \RuntimeException('Scalpel signing is enabled but the signing key (SCALPEL_SIGNING_KEY) is not configured.');
-            }
-            $signature = hash_hmac('sha256', $json, $key);
-            $payload['signature'] = $signature;
-            $json = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-        }
-
-        $this->line((string) $json);
-    }
-
-    /**
-     * Output findings as formatted tables grouped by severity.
-     */
-    private function outputTable(FindingCollection $findings): void
-    {
-        if ($findings->isEmpty()) {
-            $this->info('  ✅ No findings detected. Your application looks clean!');
-            $this->newLine();
-
-            return;
-        }
-
-        // Group findings by severity: CRITICAL first, then HIGH, MEDIUM, LOW
-        $grouped = $findings->groupBySeverity();
-        $severityOrder = [
-            Severity::CRITICAL->value,
-            Severity::HIGH->value,
-            Severity::MEDIUM->value,
-            Severity::LOW->value,
-        ];
-
-        foreach ($severityOrder as $severityValue) {
-            if (! isset($grouped[$severityValue])) {
-                continue;
-            }
-
-            $severityFindings = $grouped[$severityValue];
-            $severity = Severity::from($severityValue);
-
-            $this->line("  <fg={$severity->color()};options=bold>{$severity->badge()}</> (" . count($severityFindings) . ' findings)');
-
-            $rows = [];
-            foreach ($severityFindings as $finding) {
-                $rows[] = [
-                    $finding->severity->badge(),
-                    $finding->file,
-                    $finding->line !== null ? (string) $finding->line : '-',
-                    $finding->description,
-                ];
-            }
-
-            $this->table(
-                ['Severity', 'File', 'Line', 'Description'],
-                $rows,
-            );
-
-            $this->newLine();
-        }
-
-        // Summary table: scanner name → count
-        $this->line('  <fg=cyan;options=bold>📊 Summary by Scanner</>');
-
-        $byScanner = $findings->groupByScanner();
-        $summaryRows = [];
-
-        foreach ($byScanner as $scannerName => $scannerFindings) {
-            $summaryRows[] = [$scannerName, (string) count($scannerFindings)];
-        }
-
-        $this->table(['Scanner', 'Findings'], $summaryRows);
-        $this->newLine();
-
-        $this->line("  <fg=white;options=bold>Total findings: {$findings->count()}</>");
-
-        if ($findings->hasCriticalOrHigh()) {
-            $this->line('  <fg=red;options=bold>⚠  CRITICAL or HIGH severity findings detected. Investigate immediately!</>');
-        }
-
-        $this->newLine();
     }
 }

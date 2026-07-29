@@ -13,7 +13,7 @@ class FindingCollectionTest extends TestCase
 {
     public function test_can_add_findings_and_count_them(): void
     {
-        $collection = new FindingCollection();
+        $collection = new FindingCollection;
         $this->assertTrue($collection->isEmpty());
 
         $finding = Finding::make(Severity::CRITICAL, 'file.php', 10, 'Error', 'Scanner');

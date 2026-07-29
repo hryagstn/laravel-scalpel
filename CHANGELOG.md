@@ -5,6 +5,26 @@ All notable changes to `laravel-scalpel` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-07-29
+
+### Added
+- Added 6 new obfuscation detection patterns to `ObfuscatedCodeScanner`: `create_function`, `file_put_contents_encoded`, `superglobal_eval`, `chr_chaining`, `hex_escape_sequence`, and `dynamic_include`.
+- Added production-aware environment security checks to `EnvIntegrityScanner` (`APP_KEY` presence check, `APP_DEBUG=true` in production check, `APP_ENV=local` when assume production is active).
+- Added `--production` CLI option to `scalpel:scan` command to force production security checks.
+- Added `scalpel.assume_production` configuration option (via `SCALPEL_ASSUME_PRODUCTION` env).
+- Added HMAC-SHA256 output signing parity to `scalpel:diff --format=json` when signing is enabled.
+- Added PHPStan Level 8 static analysis (`phpstan.neon`) and Larastan integration.
+- Added Laravel Pint code formatter (`pint.json`) and automated formatting standards.
+- Added Laravel 13 compatibility testing to CI matrix.
+
+### Changed
+- **Minimum PHP version raised to 8.2+**. PHP 8.1 support has been dropped.
+- Refactored console commands using shared concerns traits (`HasBanner`, `HasScannerProgress`, `OutputsFindings`) to eliminate duplicate code.
+
+### Fixed
+- Fixed scanner alias mismatch in `ScalpelScanCommand` where `htaccess` alias mapped to `.htaccess` instead of `Htaccess`, causing `--only=htaccess` to fail silently.
+- Cleaned up root repository by removing residual debug `test.php` file.
+
 ## [1.5.2] - 2026-07-12
 
 ### Added

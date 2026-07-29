@@ -15,8 +15,8 @@ abstract class TestCase extends OrchestraTestCase
     {
         parent::setUp();
 
-        $this->tempDir = __DIR__ . '/temp';
-        if (!is_dir($this->tempDir)) {
+        $this->tempDir = __DIR__.'/temp';
+        if (! is_dir($this->tempDir)) {
             mkdir($this->tempDir, 0777, true);
         }
     }
@@ -33,7 +33,7 @@ abstract class TestCase extends OrchestraTestCase
 
     protected function cleanDir(string $dir): void
     {
-        if (!is_dir($dir)) {
+        if (! is_dir($dir)) {
             return;
         }
 
@@ -43,7 +43,7 @@ abstract class TestCase extends OrchestraTestCase
                 continue;
             }
 
-            $path = $dir . '/' . $file;
+            $path = $dir.'/'.$file;
             if (is_dir($path)) {
                 $this->cleanDir($path);
                 @rmdir($path);

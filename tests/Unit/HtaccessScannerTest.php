@@ -27,9 +27,9 @@ class HtaccessScannerTest extends TestCase
 
     public function test_flags_dangerous_add_handler(): void
     {
-        file_put_contents($this->tempDir . '/.htaccess', 'AddHandler cgi-script .py');
+        file_put_contents($this->tempDir.'/.htaccess', 'AddHandler cgi-script .py');
 
-        $scanner = new HtaccessScanner();
+        $scanner = new HtaccessScanner;
         $findings = $scanner->scan($this->tempDir);
 
         $this->assertCount(1, $findings);
@@ -39,9 +39,9 @@ class HtaccessScannerTest extends TestCase
 
     public function test_flags_dangerous_add_handler_python(): void
     {
-        file_put_contents($this->tempDir . '/.htaccess', 'AddHandler application/x-httpd-python .php');
+        file_put_contents($this->tempDir.'/.htaccess', 'AddHandler application/x-httpd-python .php');
 
-        $scanner = new HtaccessScanner();
+        $scanner = new HtaccessScanner;
         $findings = $scanner->scan($this->tempDir);
 
         $this->assertCount(1, $findings);
@@ -51,9 +51,9 @@ class HtaccessScannerTest extends TestCase
 
     public function test_flags_dangerous_add_type(): void
     {
-        file_put_contents($this->tempDir . '/.htaccess', 'AddType application/x-httpd-php .jpg');
+        file_put_contents($this->tempDir.'/.htaccess', 'AddType application/x-httpd-php .jpg');
 
-        $scanner = new HtaccessScanner();
+        $scanner = new HtaccessScanner;
         $findings = $scanner->scan($this->tempDir);
 
         $this->assertCount(1, $findings);
@@ -63,12 +63,12 @@ class HtaccessScannerTest extends TestCase
 
     public function test_flags_security_disabling_php_flags(): void
     {
-        file_put_contents($this->tempDir . '/.htaccess', "
+        file_put_contents($this->tempDir.'/.htaccess', '
             php_flag allow_url_include on
             php_value disable_functions none
-        ");
+        ');
 
-        $scanner = new HtaccessScanner();
+        $scanner = new HtaccessScanner;
         $findings = $scanner->scan($this->tempDir);
 
         $this->assertCount(2, $findings);
@@ -78,9 +78,9 @@ class HtaccessScannerTest extends TestCase
 
     public function test_flags_external_redirects(): void
     {
-        file_put_contents($this->tempDir . '/.htaccess', 'RewriteRule ^(.*)$ http://attacker.com/$1 [R=301,L]');
+        file_put_contents($this->tempDir.'/.htaccess', 'RewriteRule ^(.*)$ http://attacker.com/$1 [R=301,L]');
 
-        $scanner = new HtaccessScanner();
+        $scanner = new HtaccessScanner;
         $findings = $scanner->scan($this->tempDir);
 
         $this->assertCount(1, $findings);
@@ -89,9 +89,9 @@ class HtaccessScannerTest extends TestCase
 
     public function test_flags_exec_cgi_options(): void
     {
-        file_put_contents($this->tempDir . '/.htaccess', 'Options +ExecCGI');
+        file_put_contents($this->tempDir.'/.htaccess', 'Options +ExecCGI');
 
-        $scanner = new HtaccessScanner();
+        $scanner = new HtaccessScanner;
         $findings = $scanner->scan($this->tempDir);
 
         $this->assertCount(1, $findings);
@@ -101,13 +101,13 @@ class HtaccessScannerTest extends TestCase
     public function test_handles_broken_symlinks_safely(): void
     {
         // Create a broken symlink named .htaccess
-        @symlink($this->tempDir . '/non_existent_file.htaccess', $this->tempDir . '/.htaccess');
+        @symlink($this->tempDir.'/non_existent_file.htaccess', $this->tempDir.'/.htaccess');
 
-        $scanner = new HtaccessScanner();
+        $scanner = new HtaccessScanner;
         $findings = $scanner->scan($this->tempDir);
 
         $this->assertCount(0, $findings);
 
-        @unlink($this->tempDir . '/.htaccess');
+        @unlink($this->tempDir.'/.htaccess');
     }
 }

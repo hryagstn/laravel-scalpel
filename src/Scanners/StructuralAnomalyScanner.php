@@ -29,7 +29,7 @@ class StructuralAnomalyScanner extends BaseScanner
 
     public function scan(string $basePath): FindingCollection
     {
-        $findings = new FindingCollection();
+        $findings = new FindingCollection;
         $basePath = rtrim($basePath, '/');
 
         /** @var string[] $nonPhpZones */
@@ -47,13 +47,13 @@ class StructuralAnomalyScanner extends BaseScanner
         $excludedPaths = $this->getExcludedPaths();
 
         foreach ($nonPhpZones as $zone) {
-            $zonePath = $basePath . '/' . $zone;
+            $zonePath = $basePath.'/'.$zone;
 
             if (! is_dir($zonePath)) {
                 continue;
             }
 
-            $finder = new Finder();
+            $finder = new Finder;
             $finder->in($zonePath)
                 ->files()
                 ->ignoreDotFiles(false)
@@ -98,9 +98,7 @@ class StructuralAnomalyScanner extends BaseScanner
     /**
      * Check if a file path matches any of the explicitly allowed files.
      *
-     * @param string $relativePath
-     * @param string[] $allowedFiles
-     * @return bool
+     * @param  string[]  $allowedFiles
      */
     private function isAllowedFile(string $relativePath, array $allowedFiles): bool
     {
@@ -110,16 +108,14 @@ class StructuralAnomalyScanner extends BaseScanner
     /**
      * Check if a file resides within an allowed directory.
      *
-     * @param string $relativePath
-     * @param string[] $allowedDirectories
-     * @return bool
+     * @param  string[]  $allowedDirectories
      */
     private function isInAllowedDirectory(string $relativePath, array $allowedDirectories): bool
     {
         foreach ($allowedDirectories as $directory) {
             $directory = rtrim($directory, '/');
 
-            if (str_starts_with($relativePath, $directory . '/')) {
+            if (str_starts_with($relativePath, $directory.'/')) {
                 return true;
             }
         }
