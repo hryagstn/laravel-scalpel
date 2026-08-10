@@ -52,6 +52,46 @@ This creates `config/scalpel.php` where you can customize scan behavior, exclusi
 
 > **Requirements:** PHP 8.2+ · Laravel 10.x, 11.x, 12.x, or 13.x
 
+### 🔧 Installation Troubleshooting
+
+<details>
+<summary><strong>Getting dependency errors during installation?</strong> (click to expand)</summary>
+
+<br>
+
+If you see errors like `your php version (8.4.x) does not satisfy that requirement` or `requirements could not be resolved` when running `composer require`, **these errors are not caused by Laravel Scalpel.** They come from *other* packages already installed in your project that have strict PHP version constraints.
+
+Composer validates the entire dependency tree on every install — so if any existing package in your `composer.lock` doesn't support your current PHP version, the installation will fail even if Laravel Scalpel itself supports it.
+
+**Solution 1 — Ignore PHP platform check (recommended, non-destructive):**
+
+```bash
+composer require hryagstn/laravel-scalpel --ignore-platform-req=php
+```
+
+This installs Laravel Scalpel without attempting to re-validate other packages against your PHP version.
+
+**Solution 2 — If you also see `security advisories` blocking errors:**
+
+Newer versions of Composer block packages with known security advisories. If this prevents installation, temporarily disable the check:
+
+```bash
+composer config policy.advisories.block false
+composer require hryagstn/laravel-scalpel --ignore-platform-req=php
+```
+
+**Solution 3 — Update all dependencies together:**
+
+If you want to bring all your dependencies up-to-date (may cause breaking changes):
+
+```bash
+composer require hryagstn/laravel-scalpel -W
+```
+
+> **Note:** The `-W` flag allows Composer to update *all* packages. Review changes carefully, especially for major version bumps.
+
+</details>
+
 ---
 
 ## ⚡ Quick Start
