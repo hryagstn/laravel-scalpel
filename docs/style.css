@@ -1471,3 +1471,39 @@ ul {
     color: var(--clr-text-muted);
     line-height: 1.5;
 }
+
+/* ============================================================
+   Accessibility: visible focus indicators
+   ============================================================ */
+a:focus-visible,
+button:focus-visible,
+[role="tab"]:focus-visible {
+    outline: 2px solid var(--clr-primary);
+    outline-offset: 3px;
+    border-radius: 4px;
+}
+
+/* Inline prompt inside terminal simulation output */
+.terminal-prompt-inline {
+    color: var(--clr-primary);
+    font-weight: 600;
+}
+
+/* ============================================================
+   Reduced motion: honour user preference
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+
+    .terminal-cursor {
+        animation: none !important;
+        opacity: 1;
+    }
+}

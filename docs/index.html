@@ -13,20 +13,42 @@
     <meta name="keywords"
         content="laravel, security, scanner, forensics, php, backdoor, detection, htaccess, env integrity, baseline diff">
     <meta name="author" content="Harry Agustiana">
+    <link rel="canonical" href="https://hryagstn.github.io/laravel-scalpel/">
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
+    <meta property="og:url" content="https://hryagstn.github.io/laravel-scalpel/">
     <meta property="og:title" content="Laravel Scalpel - Intrusion Evidence Scanner">
     <meta property="og:description"
         content="Forensic filesystem auditing tool for Laravel applications. Find backdoors and filesystem tampering instantly.">
-    <meta property="og:image" content="logo.png">
+    <meta property="og:image" content="https://hryagstn.github.io/laravel-scalpel/logo.png">
 
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image">
     <meta property="twitter:title" content="Laravel Scalpel - Intrusion Evidence Scanner">
     <meta property="twitter:description"
         content="Forensic filesystem auditing tool for Laravel applications. Find backdoors and filesystem tampering instantly.">
-    <meta property="twitter:image" content="logo.png">
+    <meta property="twitter:image" content="https://hryagstn.github.io/laravel-scalpel/logo.png">
+
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Laravel Scalpel",
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "Linux, macOS",
+        "description": "A zero-dependency, filesystem-level forensic scanner that detects backdoors, rogue PHP files, tampered .htaccess directives, and unauthorized file modifications in Laravel applications.",
+        "author": {
+            "@type": "Person",
+            "name": "Harry Agustiana",
+            "url": "https://github.com/hryagstn"
+        },
+        "license": "https://opensource.org/licenses/MIT",
+        "codeRepository": "https://github.com/hryagstn/laravel-scalpel",
+        "programmingLanguage": "PHP"
+    }
+    </script>
 
     <!-- Typography & Icons -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -48,7 +70,7 @@
     <header id="main-header" class="site-header">
         <div class="container header-container">
             <a href="#" class="logo-wrapper">
-                <img src="logo.png" alt="Laravel Scalpel Logo" class="header-logo">
+                <img src="logo.png" alt="Laravel Scalpel Logo" class="header-logo" width="32" height="32">
                 <span class="logo-text">Laravel <span class="accent-text">Scalpel</span></span>
                 <span class="badge-version">v1.7.0</span>
             </a>
@@ -83,7 +105,8 @@
             </div>
 
             <!-- Mobile Menu Toggle -->
-            <button class="mobile-menu-toggle" aria-label="Toggle navigation menu" id="mobile-menu-btn">
+            <button class="mobile-menu-toggle" aria-label="Toggle navigation menu" id="mobile-menu-btn"
+                aria-expanded="false" aria-controls="mobile-nav">
                 <span class="bar"></span>
                 <span class="bar"></span>
                 <span class="bar"></span>
@@ -159,13 +182,15 @@
                             <span class="terminal-os-badge">bash</span>
                         </div>
                     </div>
-                    <div class="terminal-tabs" role="tablist">
-                        <button class="terminal-tab-btn active" id="btn-tab-scan" role="tab" aria-selected="true">php
-                            artisan scalpel:scan</button>
-                        <button class="terminal-tab-btn" id="btn-tab-baseline" role="tab" aria-selected="false">php
-                            artisan scalpel:baseline</button>
-                        <button class="terminal-tab-btn" id="btn-tab-diff" role="tab" aria-selected="false">php artisan
-                            scalpel:diff</button>
+                    <div class="terminal-tabs" role="tablist" aria-label="Simulated commands">
+                        <button class="terminal-tab-btn active" id="btn-tab-scan" role="tab" aria-selected="true"
+                            aria-controls="terminal-content">php artisan scalpel:scan</button>
+                        <button class="terminal-tab-btn" id="btn-tab-baseline" role="tab" aria-selected="false"
+                            aria-controls="terminal-content">php artisan scalpel:baseline</button>
+                        <button class="terminal-tab-btn" id="btn-tab-diff" role="tab" aria-selected="false"
+                            aria-controls="terminal-content">php artisan scalpel:diff</button>
+                        <button class="terminal-tab-btn" id="btn-tab-verify" role="tab" aria-selected="false"
+                            aria-controls="terminal-content">php artisan scalpel:verify</button>
                     </div>
                     <div class="terminal-body" id="terminal-content">
                         <!-- Content will be dynamically inserted here via app.js -->
@@ -281,8 +306,9 @@
                     </p>
                     <ul class="scanner-details">
                         <li>Configurable list of <code>non_php_zones</code></li>
+                        <li>Catches disguised extensions: <code>.phtml</code>, <code>.pht</code>, <code>.phar</code>, <code>.php5</code></li>
+                        <li>Detects double-extension bypasses like <code>shell.php.jpg</code></li>
                         <li>Custom file whitelist (e.g. <code>index.php</code>)</li>
-                        <li>Automatic path resolution for framework vendors</li>
                     </ul>
                 </div>
 
@@ -306,7 +332,8 @@
                     <ul class="scanner-details">
                         <li>Detects <code>eval(base64_decode)</code>, <code>superglobal_eval</code>, <code>dynamic_include</code></li>
                         <li>Flags <code>create_function</code> & encoded <code>file_put_contents</code> droppers</li>
-                        <li>Flags <code>chr()</code> chaining, hex sequences, long strings (>=500 chars)</li>
+                        <li>Flags backtick operators, <code>$$var</code> indirection &amp; <code>extract($_REQUEST)</code></li>
+                        <li>Flags <code>chr()</code> chaining, hex sequences, long strings (&gt;=500 chars)</li>
                     </ul>
                 </div>
 
@@ -324,12 +351,12 @@
                     <h3>htaccess Directive Scanner</h3>
                     <p>
                         Audits Apache configurations for injected rules changing handler maps to trigger external
-                        scripts (Python, Perl).
+                        scripts (Python, Perl) — plus the PHP-FPM equivalent, <code>.user.ini</code>.
                     </p>
                     <ul class="scanner-details">
                         <li>Flags unauthorized <code>AddHandler</code> triggers</li>
-                        <li>Flags server side script hooks inside directories</li>
-                        <li>Finds customized CGI interpreter bindings</li>
+                        <li>Detects <code>.user.ini</code> persistence via <code>auto_prepend_file</code></li>
+                        <li>Catches dangerous PHP directives (<code>allow_url_include</code>, emptied <code>disable_functions</code>)</li>
                     </ul>
                 </div>
 
@@ -350,9 +377,9 @@
                     </p>
                     <ul class="scanner-details">
                         <li>Generates <code>baseline.json</code> snapshots</li>
+                        <li>HMAC-signed snapshots — tampered baselines are reported as CRITICAL</li>
                         <li>Excludes dynamic paths (logs, caching views)</li>
                         <li>Supports <code>--fast</code> option for deferred hashing</li>
-                        <li>Ideal tool for post-deployment checks</li>
                     </ul>
                 </div>
 
@@ -375,9 +402,9 @@
                         or tampering.
                     </p>
                     <ul class="scanner-details">
-                        <li>Checks file existence & permissions</li>
-                        <li>Verifies <code>APP_KEY</code> & <code>APP_DEBUG=true</code> in production</li>
-                        <li>Supports <code>--production</code> flag & <code>APP_ENV</code> auto-detect</li>
+                        <li>Detects missing, empty, unreadable or world-readable <code>.env</code></li>
+                        <li>Verifies <code>APP_KEY</code> &amp; flags <code>APP_DEBUG=true</code> in production</li>
+                        <li>Compares keys against <code>.env.example</code> both ways</li>
                     </ul>
                 </div>
             </div>
@@ -448,23 +475,32 @@
 
             <div class="code-tabs-container">
                 <div class="code-tabs-sidebar">
-                    <button class="code-tab-btn active" data-target="tab-code-config">
+                    <button class="code-tab-btn active" data-target="tab-code-config" role="tab" aria-selected="true"
+                        aria-controls="tab-code-config" id="code-tab-config">
                         <span class="tab-label">config/scalpel.php</span>
                         <span class="tab-desc">Package configuration</span>
                     </button>
-                    <button class="code-tab-btn" data-target="tab-code-ci">
+                    <button class="code-tab-btn" data-target="tab-code-ci" role="tab" aria-selected="false"
+                        aria-controls="tab-code-ci" id="code-tab-ci">
                         <span class="tab-label">github-actions.yml</span>
                         <span class="tab-desc">CI/CD security gate</span>
                     </button>
-                    <button class="code-tab-btn" data-target="tab-code-n8n">
+                    <button class="code-tab-btn" data-target="tab-code-n8n" role="tab" aria-selected="false"
+                        aria-controls="tab-code-n8n" id="code-tab-n8n">
                         <span class="tab-label">n8n Bastion Alert</span>
                         <span class="tab-desc">Real-time alerts via Telegram</span>
+                    </button>
+                    <button class="code-tab-btn" data-target="tab-code-event" role="tab" aria-selected="false"
+                        aria-controls="tab-code-event" id="code-tab-event">
+                        <span class="tab-label">ScanFinished Event</span>
+                        <span class="tab-desc">Native Laravel alerting</span>
                     </button>
                 </div>
 
                 <div class="code-panels-wrapper">
                     <!-- Tab Panel 1: Configuration -->
-                    <div class="code-panel active" id="tab-code-config">
+                    <div class="code-panel active" id="tab-code-config" role="tabpanel"
+                        aria-labelledby="code-tab-config">
                         <div class="panel-meta">
                             <span class="file-path">config/scalpel.php</span>
                             <button class="btn-copy-code" data-clipboard="code-config-content">Copy Config</button>
@@ -502,6 +538,11 @@
         <span class="string">'bootstrap/cache'</span>,
     ],
 
+    <span class="comment">// Extensions treated as executable PHP (incl. disguised webshells)</span>
+    <span class="string">'suspicious_php_extensions'</span> => [
+        <span class="string">'php'</span>, <span class="string">'pht'</span>, <span class="string">'phtm'</span>, <span class="string">'phtml'</span>, <span class="string">'phar'</span>, <span class="string">'php5'</span>,
+    ],
+
     <span class="comment">// Target obfuscation regex checks</span>
     <span class="string">'obfuscation_patterns'</span> => [
         <span class="string">'eval_base64_decode'</span>        => <span class="constant">true</span>,
@@ -510,6 +551,9 @@
         <span class="string">'eval_gzuncompress'</span>         => <span class="constant">true</span>,
         <span class="string">'eval_gzdecode'</span>             => <span class="constant">true</span>,
         <span class="string">'assert_dynamic'</span>            => <span class="constant">true</span>,
+        <span class="string">'backtick_operator'</span>         => <span class="constant">true</span>,
+        <span class="string">'variable_variables'</span>        => <span class="constant">true</span>,
+        <span class="string">'extract_input'</span>             => <span class="constant">true</span>,
         <span class="string">'variable_functions'</span>        => <span class="constant">true</span>,
         <span class="string">'preg_replace_e'</span>            => <span class="constant">true</span>,
         <span class="string">'long_encoded_string'</span>       => <span class="constant">true</span>,
@@ -523,6 +567,9 @@
 
     <span class="string">'long_string_threshold'</span> => <span class="number">500</span>,
     <span class="string">'severity_threshold'</span> => <span class="string">'LOW'</span>,
+
+    <span class="comment">// Hide the banner in cron jobs and CI logs</span>
+    <span class="string">'suppress_banner'</span> => <span class="keyword">env</span>(<span class="string">'SCALPEL_SUPPRESS_BANNER'</span>, <span class="constant">false</span>),
 
     <span class="comment">// Use metadata-based fast scans; set true via --fast parameter or env override</span>
     <span class="string">'baseline_fast_scan'</span> => <span class="keyword">env</span>(<span class="string">'SCALPEL_BASELINE_FAST_SCAN'</span>, <span class="constant">false</span>),
@@ -539,7 +586,7 @@
                     </div>
 
                     <!-- Tab Panel 2: CI/CD -->
-                    <div class="code-panel" id="tab-code-ci">
+                    <div class="code-panel" id="tab-code-ci" role="tabpanel" aria-labelledby="code-tab-ci">
                         <div class="panel-meta">
                             <span class="file-path">.github/workflows/security.yml</span>
                             <button class="btn-copy-code" data-clipboard="code-ci-content">Copy YAML</button>
@@ -548,6 +595,8 @@
 
 <span class="keyword">on</span>:
   <span class="keyword">push</span>:
+    <span class="keyword">branches</span>: [main]
+  <span class="keyword">pull_request</span>:
     <span class="keyword">branches</span>: [main]
   <span class="keyword">schedule</span>:
     - <span class="keyword">cron</span>: <span class="string">'0 6 * * *'</span> <span class="comment"># Daily at 6 AM UTC</span>
@@ -566,15 +615,16 @@
       - <span class="keyword">name</span>: Install Dependencies
         <span class="keyword">run</span>: composer install --no-interaction --prefer-dist
 
+      <span class="comment"># Annotations render inline on pull requests (::error / ::warning)</span>
       - <span class="keyword">name</span>: Run Scalpel Scan
-        <span class="keyword">run</span>: php artisan scalpel:scan --format=json
+        <span class="keyword">run</span>: php artisan scalpel:scan --format=github
 
       - <span class="keyword">name</span>: Run Baseline Diff
         <span class="keyword">run</span>: php artisan scalpel:diff --format=json</code></pre>
                     </div>
 
                     <!-- Tab Panel 3: n8n Integration -->
-                    <div class="code-panel" id="tab-code-n8n">
+                    <div class="code-panel" id="tab-code-n8n" role="tabpanel" aria-labelledby="code-tab-n8n">
                         <div class="panel-meta">
                             <span class="file-path">Integrate with n8n-bastion</span>
                             <button class="btn-copy-code" data-clipboard="code-n8n-content">Copy Script</button>
@@ -587,11 +637,35 @@ RESULT=$(php artisan scalpel:scan --format=json)
 EXIT_CODE=$?
 
 <span class="keyword">if</span> [ $EXIT_CODE -ne 0 ]; <span class="keyword">then</span>
-    <span class="comment"># Send payload to n8n webhook</span>
-    curl -X POST https://your-n8n-bastion-domain.com/webhook/scalpel-alert \
-      -H <span class="string">"Content-Type: application/json"</span> \
-      -d <span class="string">"{\"status\": \"compromised\", \"findings\": $RESULT}"</span>
+    <span class="comment"># Verify the report was not tampered with before dispatching</span>
+    <span class="keyword">if</span> php artisan scalpel:verify /tmp/scalpel-output.json; <span class="keyword">then</span>
+        curl -X POST https://your-n8n-bastion-domain.com/webhook/scalpel-alert \
+          -H <span class="string">"Content-Type: application/json"</span> \
+          -d <span class="string">"{\"status\": \"compromised\", \"findings\": $RESULT}"</span>
+    <span class="keyword">fi</span>
 <span class="keyword">fi</span></code></pre>
+                    </div>
+
+                    <!-- Tab Panel 4: Laravel Event -->
+                    <div class="code-panel" id="tab-code-event" role="tabpanel" aria-labelledby="code-tab-event">
+                        <div class="panel-meta">
+                            <span class="file-path">app/Providers/AppServiceProvider.php</span>
+                            <button class="btn-copy-code" data-clipboard="code-event-content">Copy PHP</button>
+                        </div>
+                        <pre class="code-block" id="code-event-content"><code><span class="keyword">use</span> Hryagstn\Scalpel\Events\ScanFinished;
+<span class="keyword">use</span> Illuminate\Support\Facades\Event;
+<span class="keyword">use</span> Illuminate\Support\Facades\Mail;
+
+<span class="keyword">public function</span> <span class="function">boot</span>(): <span class="keyword">void</span>
+{
+    Event::listen(ScanFinished::class, <span class="keyword">function</span> (ScanFinished $event) {
+        <span class="comment">// $event-&gt;findings, $event-&gt;context ('scan'|'diff'), $event-&gt;durationMs</span>
+        <span class="keyword">if</span> ($event-&gt;findings-&gt;hasCriticalOrHigh()) {
+            Mail::to(<span class="string">'security@example.com'</span>)
+                -&gt;send(<span class="keyword">new</span> \App\Mail\ScalpelAlert($event-&gt;findings));
+        }
+    });
+}</code></pre>
                     </div>
                 </div>
             </div>
@@ -697,7 +771,7 @@ EXIT_CODE=$?
         <div class="container footer-container">
             <div class="footer-brand">
                 <div class="footer-logo-wrap">
-                    <img src="logo.png" alt="Laravel Scalpel Logo" class="footer-logo">
+                    <img src="logo.png" alt="Laravel Scalpel Logo" class="footer-logo" width="32" height="32">
                     <span class="footer-title">Laravel Scalpel</span>
                 </div>
                 <p class="footer-tagline">Intrusion Evidence Scanner for Laravel.</p>
@@ -727,8 +801,9 @@ EXIT_CODE=$?
 
         <div class="footer-bottom">
             <div class="container footer-bottom-container">
-                <p class="copyright">&copy; 2026. Created by <a href="https://github.com/hryagstn" target="_blank"
-                        rel="noopener">Harry Agustiana</a>. Code licensed under MIT.</p>
+                <p class="copyright">&copy; <span id="copyright-year">2026</span>. Created by <a
+                        href="https://github.com/hryagstn" target="_blank" rel="noopener">Harry Agustiana</a>. Code
+                    licensed under MIT.</p>
                 <div class="laravel-disclaimer">This package is an independent community project and is not affiliated
                     with or endorsed by Taylor Otwell or Laravel LLC.</div>
             </div>
@@ -739,7 +814,7 @@ EXIT_CODE=$?
     <div id="copy-tooltip" class="copy-tooltip">Copied!</div>
 
     <!-- Interactive script -->
-    <script src="app.js"></script>
+    <script src="app.js" defer></script>
 </body>
 
 </html>

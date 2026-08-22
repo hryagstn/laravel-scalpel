@@ -1,0 +1,24 @@
+codecov:
+  branch: main
+  require_ci_to_pass: true
+
+coverage:
+  precision: 2
+  round: down
+  status:
+    project:
+      default:
+        target: auto
+        if_ci_failed: error
+    patch:
+      default:
+        target: auto
+
+comment:
+  layout: "reach, diff, flags, files"
+  behavior: default
+  require_changes: false
+
+ignore:
+  - "tests"
+  - "docs"

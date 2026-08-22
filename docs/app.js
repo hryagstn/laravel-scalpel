@@ -1,5 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
 
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
     // -------------------------------------------------------------
     // 1. Navigation & Scroll Effects
     // -------------------------------------------------------------
@@ -10,43 +12,88 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             header.classList.remove('scrolled');
         }
-    });
+    }, { passive: true });
 
     // Mobile Menu Toggle
     const mobileMenuBtn = document.getElementById('mobile-menu-btn');
     const mobileNav = document.getElementById('mobile-nav');
 
+    function setMobileMenu(open) {
+        if (!mobileMenuBtn || !mobileNav) {
+            return;
+        }
+
+        mobileMenuBtn.classList.toggle('active', open);
+        mobileNav.classList.toggle('active', open);
+        mobileMenuBtn.setAttribute('aria-expanded', String(open));
+
+        const bars = mobileMenuBtn.querySelectorAll('.bar');
+        if (open) {
+            bars[0].style.transform = 'rotate(-45deg) translate(-5px, 6px)';
+            bars[1].style.opacity = '0';
+            bars[2].style.transform = 'rotate(45deg) translate(-5px, -6px)';
+        } else {
+            bars[0].style.transform = 'none';
+            bars[1].style.opacity = '1';
+            bars[2].style.transform = 'none';
+        }
+    }
+
     if (mobileMenuBtn && mobileNav) {
         mobileMenuBtn.addEventListener('click', () => {
-            mobileMenuBtn.classList.toggle('active');
-            mobileNav.classList.toggle('active');
-            
-            // Toggle hamburger animation
-            const bars = mobileMenuBtn.querySelectorAll('.bar');
-            if (mobileMenuBtn.classList.contains('active')) {
-                bars[0].style.transform = 'rotate(-45deg) translate(-5px, 6px)';
-                bars[1].style.opacity = '0';
-                bars[2].style.transform = 'rotate(45deg) translate(-5px, -6px)';
-            } else {
-                bars[0].style.transform = 'none';
-                bars[1].style.opacity = '1';
-                bars[2].style.transform = 'none';
-            }
+            setMobileMenu(!mobileNav.classList.contains('active'));
         });
-        
-        // Close menu on link click
+
+        // Close menu on link click or Escape
         mobileNav.querySelectorAll('a').forEach(link => {
-            link.addEventListener('click', () => {
-                mobileMenuBtn.classList.remove('active');
-                mobileNav.classList.remove('active');
-                mobileMenuBtn.querySelectorAll('.bar').forEach(b => b.style.transform = 'none');
-                mobileMenuBtn.querySelector('.bar:nth-child(2)').style.opacity = '1';
-            });
+            link.addEventListener('click', () => setMobileMenu(false));
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && mobileNav.classList.contains('active')) {
+                setMobileMenu(false);
+                mobileMenuBtn.focus();
+            }
         });
     }
 
     // -------------------------------------------------------------
-    // 2. Configuration Tabs
+    // 2. Accessible Tab Groups (arrow-key roving focus)
+    // -------------------------------------------------------------
+    function setupTabGroup(tablistSelector) {
+        const tablist = document.querySelector(tablistSelector);
+
+        if (!tablist) {
+            return;
+        }
+
+        const tabs = Array.from(tablist.querySelectorAll('[role="tab"]'));
+
+        tablist.addEventListener('keydown', (e) => {
+            if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') {
+                return;
+            }
+
+            e.preventDefault();
+
+            const currentIndex = tabs.indexOf(document.activeElement);
+            if (currentIndex === -1) {
+                return;
+            }
+
+            const delta = e.key === 'ArrowRight' ? 1 : -1;
+            const nextTab = tabs[(currentIndex + delta + tabs.length) % tabs.length];
+
+            nextTab.focus();
+            nextTab.click();
+        });
+    }
+
+    setupTabGroup('.terminal-tabs');
+    setupTabGroup('.code-tabs-sidebar');
+
+    // -------------------------------------------------------------
+    // 3. Configuration Tabs
     // -------------------------------------------------------------
     const codeTabBtns = document.querySelectorAll('.code-tab-btn');
     const codePanels = document.querySelectorAll('.code-panel');
@@ -54,11 +101,11 @@ document.addEventListener('DOMContentLoaded', () => {
     codeTabBtns.forEach(btn => {
         btn.addEventListener('click', () => {
             const target = btn.getAttribute('data-target');
-            
+
             // Toggle buttons
-            codeTabBtns.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            
+            codeTabBtns.forEach(b => b.setAttribute('aria-selected', 'false'));
+            btn.setAttribute('aria-selected', 'true');
+
             // Toggle panels
             codePanels.forEach(p => p.classList.remove('active'));
             document.getElementById(target).classList.add('active');
@@ -66,10 +113,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // -------------------------------------------------------------
-    // 3. Clipboard Copy Functionality
+    // 4. Clipboard Copy Functionality
     // -------------------------------------------------------------
     const tooltip = document.getElementById('copy-tooltip');
-    
+
     function showTooltip(message = 'Copied!') {
         tooltip.textContent = message;
         tooltip.classList.add('show');
@@ -96,77 +143,101 @@ document.addEventListener('DOMContentLoaded', () => {
             const elementId = btn.getAttribute('data-clipboard');
             const codeText = document.getElementById(elementId).innerText;
             navigator.clipboard.writeText(codeText)
-                .then(() => showTooltip('Config copied to clipboard!'))
+                .then(() => showTooltip('Code copied to clipboard!'))
                 .catch(() => showTooltip('Failed to copy'));
         });
     });
 
     // -------------------------------------------------------------
-    // 4. Interactive Terminal Simulator
+    // 5. Interactive Terminal Simulator
     // -------------------------------------------------------------
     const terminalContent = document.getElementById('terminal-content');
-    const tabScan = document.getElementById('btn-tab-scan');
-    const tabBaseline = document.getElementById('btn-tab-baseline');
-    const tabDiff = document.getElementById('btn-tab-diff');
     const runBtn = document.getElementById('btn-run-terminal');
 
     let currentCommand = 'scan';
     let typingInterval = null;
     let sequenceTimeout = null;
 
-    // Simulation Data definitions
+    // Simulation Data definitions (mirrors real CLI output)
     const simulations = {
         scan: {
             command: 'php artisan scalpel:scan',
             lines: [
-                { type: 'output', text: '<span class="t-muted">Running structural anomaly scanner...</span> <span class="t-success">[OK]</span>' },
-                { type: 'output', text: '<span class="t-muted">Running obfuscated code scanner...</span> <span class="t-crit">[SUSPICIOUS]</span>' },
-                { type: 'output', text: '<span class="t-muted">Running htaccess scanner...</span> <span class="t-success">[OK]</span>' },
-                { type: 'output', text: '<span class="t-muted">Running env integrity scanner...</span> <span class="t-success">[OK]</span>' },
+                { type: 'output', text: '<span class="t-muted">  ╔══════════════════════════════════════════════════╗</span>' },
+                { type: 'output', text: '<span class="t-muted">  ║</span> 🔬 <span class="t-cyan">Laravel Scalpel</span> — Intrusion Evidence Scanner <span class="t-muted">║</span>' },
+                { type: 'output', text: '<span class="t-muted">  ╚══════════════════════════════════════════════════╝</span>' },
                 { type: 'output', text: '' },
-                { type: 'output', text: '<span class="t-header">+-------------------------------------+----------+-------------------------------------+</span>' },
-                { type: 'output', text: '<span class="t-header">| File Path                           | Severity | Finding                             |</span>' },
-                { type: 'output', text: '<span class="t-header">+-------------------------------------+----------+-------------------------------------+</span>' },
-                { type: 'output', text: '| <span class="t-high">public/icons/avatar.php</span>             | <span class="t-crit">CRITICAL</span> | eval(base64_decode) backdoor found  |' },
-                { type: 'output', text: '| <span class="t-muted">storage/framework/cache/import.php</span>  | <span class="t-high">HIGH</span>     | Long encoded string (610 chars)     |' },
-                { type: 'output', text: '<span class="t-header">+-------------------------------------+----------+-------------------------------------+</span>' },
+                { type: 'output', text: '<span class="t-cyan">  ▸</span> Running scanner: <span class="t-header">Structural Anomaly</span>' },
+                { type: 'output', text: '<span class="t-cyan">  ▸</span> Running scanner: <span class="t-header">Obfuscated Code</span>' },
+                { type: 'output', text: '<span class="t-cyan">  ▸</span> Running scanner: <span class="t-header">Htaccess</span>' },
+                { type: 'output', text: '<span class="t-cyan">  ▸</span> Running scanner: <span class="t-header">Baseline Diff</span>' },
+                { type: 'output', text: '<span class="t-cyan">  ▸</span> Running scanner: <span class="t-header">Env Integrity</span>' },
                 { type: 'output', text: '' },
-                { type: 'output', text: '<span class="t-crit">Scan completed in 0.12s. Found 2 issues (1 CRITICAL, 1 HIGH).</span>' },
+                { type: 'output', text: '<span class="t-crit">  🔴 CRITICAL</span> <span class="t-muted">(1 findings)</span>' },
+                { type: 'output', text: '<span class="t-muted">  +---------------------------+------+------------------------------------------------+</span>' },
+                { type: 'output', text: '<span class="t-muted">  | File                      | Line | Description                                    |</span>' },
+                { type: 'output', text: '<span class="t-muted">  +---------------------------+------+------------------------------------------------+</span>' },
+                { type: 'output', text: '  | 🔴 public/icons/avatar.php | 1    | eval(base64_decode(...)) detected — classic...' } ,
+                { type: 'output', text: '<span class="t-muted">  +---------------------------+------+------------------------------------------------+</span>' },
+                { type: 'output', text: '' },
+                { type: 'output', text: '<span class="t-high">  🟠 HIGH</span> <span class="t-muted">(1 findings)</span>' },
+                { type: 'output', text: '  | 🟠 public/js/app.min.php   | -    | PHP file (\'.php\') found in non-PHP zone \'public\'.' },
+                { type: 'output', text: '' },
+                { type: 'output', text: '  <span class="t-header">📊 Summary by Scanner</span>' },
+                { type: 'output', text: '  Obfuscated Code ......... 1' },
+                { type: 'output', text: '  Structural Anomaly ...... 1' },
+                { type: 'output', text: '' },
+                { type: 'output', text: '  Total findings: <span class="t-header">2</span>' },
+                { type: 'output', text: '<span class="t-crit">  ⚠  CRITICAL or HIGH severity findings detected. Investigate immediately!</span>' },
+                { type: 'output', text: '' },
                 { type: 'output', text: '<span class="t-muted">Exit code: 1</span>' }
             ]
         },
         baseline: {
-            command: 'php artisan scalpel:baseline',
+            command: 'php artisan scalpel:baseline --force',
             lines: [
-                { type: 'output', text: 'Scanning project files for baseline snapshot...' },
-                { type: 'output', text: 'Calculating cryptographic SHA-256 hashes...' },
-                { type: 'output', text: 'Ignoring configured exclusions:' },
-                { type: 'output', text: '  - storage/logs/*' },
-                { type: 'output', text: '  - storage/framework/cache/*' },
-                { type: 'output', text: '  - node_modules/*' },
+                { type: 'output', text: '<span class="t-cyan">  ▸</span> Creating baseline snapshot...' },
+                { type: 'output', text: '  <span class="t-muted">12,847/12,847 [████████████████████] 100% -- Complete!</span>' },
                 { type: 'output', text: '' },
-                { type: 'output', text: '<span class="t-success">✔ Baseline snapshot generated successfully!</span>' },
-                { type: 'output', text: 'Stored in: <span class="t-cyan">storage/app/private/scalpel/baseline.json</span> (482 files indexed)' },
+                { type: 'output', text: '<span class="t-success">  ✅ Baseline snapshot created successfully.</span>' },
+                { type: 'output', text: '  Files indexed : <span class="t-header">12,847</span>' },
+                { type: 'output', text: '  Total size    : <span class="t-header">214.6 MB</span>' },
+                { type: 'output', text: '  Stored in     : <span class="t-cyan">storage/app/private/scalpel/baseline.json</span>' },
+                { type: 'output', text: '  HMAC signed   : <span class="t-success">yes</span> <span class="t-muted">(tampering will be detected by scalpel:diff)</span>' },
+                { type: 'output', text: '' },
                 { type: 'output', text: '<span class="t-muted">Exit code: 0</span>' }
             ]
         },
         diff: {
             command: 'php artisan scalpel:diff',
             lines: [
-                { type: 'output', text: 'Loading baseline snapshot... <span class="t-success">[OK]</span>' },
-                { type: 'output', text: 'Comparing current filesystem against baseline...' },
+                { type: 'output', text: '<span class="t-cyan">  ▸</span> Comparing filesystem against baseline...' },
+                { type: 'output', text: '  <span class="t-muted">12,851/12,847 [████████████████████] 100% -- Complete!</span>' },
                 { type: 'output', text: '' },
-                { type: 'output', text: '<span class="t-header">+-------------------------+-----------+-------------------------+</span>' },
-                { type: 'output', text: '<span class="t-header">| File Path               | Status    | Severity                |</span>' },
-                { type: 'output', text: '<span class="t-header">+-------------------------+-----------+-------------------------+</span>' },
-                { type: 'output', text: '| <span class="t-high">public/icons/avatar.php</span> | <span class="t-crit">ADDED</span>     | <span class="t-crit">CRITICAL (Backdoor)</span>     |' },
-                { type: 'output', text: '| <span class="t-high">.env</span>                    | <span class="t-high">MODIFIED</span>  | <span class="t-high">HIGH (Tampered)</span>         |' },
-                { type: 'output', text: '| <span class="t-muted">config/app.php</span>          | <span class="t-low">MODIFIED</span>  | LOW (Updated config)    |' },
-                { type: 'output', text: '| <span class="t-muted">tests/TestCase.php</span>      | <span class="t-med">DELETED</span>   | MEDIUM                  |' },
-                { type: 'output', text: '<span class="t-header">+-------------------------+-----------+-------------------------+</span>' },
+                { type: 'output', text: '<span class="t-crit">  🔴 CRITICAL</span> <span class="t-muted">(1 findings)</span>' },
+                { type: 'output', text: '  | 🔴 .env                     | -    | File has been deleted since baseline snapshot.' },
                 { type: 'output', text: '' },
-                { type: 'output', text: '<span class="t-crit">Baseline diff comparison finished.</span>' },
-                { type: 'output', text: 'Detected: <span class="t-crit">1 Added</span>, <span class="t-med">1 Deleted</span>, <span class="t-high">2 Modified</span> files.' },
+                { type: 'output', text: '<span class="t-high">  🟠 HIGH</span> <span class="t-muted">(2 findings)</span>' },
+                { type: 'output', text: '  | 🟠 public/icons/avatar.php  | -    | New file detected that was not in the baseline snapshot.' },
+                { type: 'output', text: '  | 🟠 routes/web.php           | -    | File has been modified since baseline (hash mismatch).' },
+                { type: 'output', text: '' },
+                { type: 'output', text: '  Total changes detected: <span class="t-header">3</span>' },
+                { type: 'output', text: '<span class="t-crit">  ⚠  CRITICAL or HIGH severity changes detected. Investigate immediately!</span>' },
+                { type: 'output', text: '' },
+                { type: 'output', text: '<span class="t-muted">Exit code: 1</span>' }
+            ]
+        },
+        verify: {
+            command: 'php artisan scalpel:verify storage/scalpel-output.json',
+            lines: [
+                { type: 'output', text: '<span class="t-success">  ✅ Output integrity verified successfully.</span>' },
+                { type: 'output', text: '' },
+                { type: 'output', text: '<span class="t-muted">Exit code: 0</span>' },
+                { type: 'output', text: '' },
+                { type: 'output', text: '<span class="terminal-prompt-inline">hryagstn@vps:~/laravel-scalpel$</span> php artisan scalpel:verify tampered-output.json' },
+                { type: 'output', text: '<span class="t-crit">  ❌ Signature verification failed. The payload has been tampered with</span>' },
+                { type: 'output', text: '<span class="t-crit">     or signed with a different key.</span>' },
+                { type: 'output', text: '' },
                 { type: 'output', text: '<span class="t-muted">Exit code: 1</span>' }
             ]
         }
@@ -181,7 +252,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function runSimulation(simKey) {
         clearSimulation();
         const sim = simulations[simKey];
-        
+
         // 1. Render prompt line
         const inputLine = document.createElement('div');
         inputLine.className = 'terminal-input-line';
@@ -192,13 +263,21 @@ document.addEventListener('DOMContentLoaded', () => {
             </span>
         `;
         terminalContent.appendChild(inputLine);
-        
+
         const cmdSpan = inputLine.querySelector('.terminal-command');
         const cursor = inputLine.querySelector('.terminal-cursor');
-        
+
         let charIndex = 0;
         const commandText = sim.command;
-        
+
+        // Respect reduced motion: render instantly instead of typing
+        if (prefersReducedMotion) {
+            cmdSpan.textContent = commandText;
+            cursor.remove();
+            renderOutputs(sim.lines);
+            return;
+        }
+
         // 2. Typing animation for command
         typingInterval = setInterval(() => {
             if (charIndex < commandText.length) {
@@ -207,18 +286,18 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 clearInterval(typingInterval);
                 cursor.remove(); // Remove active prompt cursor
-                
+
                 // Trigger outputs
                 sequenceTimeout = setTimeout(() => {
                     renderOutputs(sim.lines);
                 }, 400);
             }
-        }, 50); // Speed of typing
+        }, 40); // Speed of typing
     }
 
     function renderOutputs(lines) {
         let lineIndex = 0;
-        
+
         function printNextLine() {
             if (lineIndex < lines.length) {
                 const line = lines[lineIndex];
@@ -226,13 +305,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 lineDiv.className = 'terminal-output';
                 lineDiv.innerHTML = line.text;
                 terminalContent.appendChild(lineDiv);
-                
+
                 // Auto Scroll
                 terminalContent.scrollTop = terminalContent.scrollHeight;
-                
+
                 lineIndex++;
                 // Variables speeds for output generation for realistic shell simulation
-                const delay = line.text === '' ? 150 : Math.random() * 80 + 40;
+                const delay = prefersReducedMotion ? 0 : (line.text === '' ? 150 : Math.random() * 80 + 40);
                 sequenceTimeout = setTimeout(printNextLine, delay);
             } else {
                 // Done printing lines, append empty prompt and a blinking cursor at the bottom
@@ -247,26 +326,31 @@ document.addEventListener('DOMContentLoaded', () => {
                 terminalContent.scrollTop = terminalContent.scrollHeight;
             }
         }
-        
+
         printNextLine();
     }
 
     // Event Handlers for Terminal Tabs
-    tabScan.addEventListener('click', () => {
-        toggleTab(tabScan, 'scan');
-    });
+    const terminalTabs = {
+        'btn-tab-scan': 'scan',
+        'btn-tab-baseline': 'baseline',
+        'btn-tab-diff': 'diff',
+        'btn-tab-verify': 'verify',
+    };
 
-    tabBaseline.addEventListener('click', () => {
-        toggleTab(tabBaseline, 'baseline');
-    });
+    Object.entries(terminalTabs).forEach(([btnId, simKey]) => {
+        const btn = document.getElementById(btnId);
 
-    tabDiff.addEventListener('click', () => {
-        toggleTab(tabDiff, 'diff');
+        if (!btn) {
+            return;
+        }
+
+        btn.addEventListener('click', () => toggleTab(btn, simKey));
     });
 
     function toggleTab(clickedTab, simKey) {
         if (currentCommand === simKey && terminalContent.children.length > 0) return;
-        
+
         // Update tabs active state
         document.querySelectorAll('.terminal-tab-btn').forEach(btn => {
             btn.classList.remove('active');
@@ -274,7 +358,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         clickedTab.classList.add('active');
         clickedTab.setAttribute('aria-selected', 'true');
-        
+
         currentCommand = simKey;
         runSimulation(simKey);
     }
@@ -287,7 +371,7 @@ document.addEventListener('DOMContentLoaded', () => {
     runSimulation('scan');
 
     // -------------------------------------------------------------
-    // 5. Bento Card Mouse Hover Glow Spell Effect
+    // 6. Bento Card Mouse Hover Glow Spell Effect
     // -------------------------------------------------------------
     const cards = document.querySelectorAll('.scanner-card');
     cards.forEach(card => {
@@ -295,30 +379,44 @@ document.addEventListener('DOMContentLoaded', () => {
             const rect = card.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
-            
+
             card.style.setProperty('--x', `${x}px`);
             card.style.setProperty('--y', `${y}px`);
         });
     });
 
     // -------------------------------------------------------------
-    // 6. Dynamic Version Tag Fetcher
+    // 7. Dynamic Version Tag Fetcher
     // -------------------------------------------------------------
     async function fetchLatestVersion() {
         try {
-            const response = await fetch('https://api.github.com/repos/hryagstn/laravel-scalpel/tags');
-            if (response.ok) {
-                const tags = await response.json();
-                if (tags && tags.length > 0 && tags[0].name) {
-                    const latestVersion = tags[0].name;
-                    document.querySelectorAll('.badge-version').forEach(el => {
-                        el.textContent = latestVersion;
-                    });
-                }
+            const response = await fetch('https://api.github.com/repos/hryagstn/laravel-scalpel/releases/latest');
+
+            if (! response.ok) {
+                return;
+            }
+
+            const release = await response.json();
+            const latestVersion = release && release.tag_name;
+
+            // Only accept well-formed version tags
+            if (latestVersion && /^v?\d+\.\d+\.\d+$/.test(latestVersion)) {
+                document.querySelectorAll('.badge-version').forEach(el => {
+                    el.textContent = latestVersion.startsWith('v') ? latestVersion : `v${latestVersion}`;
+                });
             }
         } catch (error) {
             console.warn('Failed to fetch latest release version from GitHub:', error);
         }
     }
     fetchLatestVersion();
+
+    // -------------------------------------------------------------
+    // 8. Dynamic Copyright Year
+    // -------------------------------------------------------------
+    const yearEl = document.getElementById('copyright-year');
+
+    if (yearEl) {
+        yearEl.textContent = String(new Date().getFullYear());
+    }
 });

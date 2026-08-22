@@ -128,6 +128,33 @@ To maintain a clean and consistent codebase:
 
 ---
 
+## Release Checklist
+
+When preparing a new release, keep every documentation surface in sync. The project has **four** places where version/feature information lives — missing one leaves stale docs behind:
+
+1. **`CHANGELOG.md`** — add a section for the new version (Keep a Changelog format).
+2. **`README.md`** — update command reference, options tables, config reference, and scanner descriptions if behaviour changed.
+3. **`config/scalpel.php`** — ensure newly introduced config keys exist in the published config with sane defaults.
+4. **`docs/index.html` + `docs/app.js`** (GitHub Pages landing page):
+   - Update the build comment and `.badge-version` fallback string to the new version.
+   - Update **scanner cards** if detection capabilities changed.
+   - Update the **terminal simulator scripts** (`simulations` object in `app.js`) so sample output matches real CLI output.
+   - Sync the **example `config/scalpel.php` panel** with the actual published config keys.
+   - Add tabs/examples for any new integration surface (events, output formats, flags).
+
+Then:
+
+```bash
+composer test && composer analyse && composer format:check
+git tag -a vX.Y.Z -m "Laravel Scalpel vX.Y.Z"
+git push origin main vX.Y.Z
+gh release create vX.Y.Z --title "vX.Y.Z" --notes-file release-notes.md
+```
+
+The tag push triggers Packagist auto-update; pushing `main` redeploys the GitHub Pages site from `docs/`.
+
+---
+
 ## License
 
 By contributing to Laravel Scalpel, you agree that your contributions will be licensed under the MIT License of the project.
