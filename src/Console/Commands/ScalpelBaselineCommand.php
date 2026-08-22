@@ -4,17 +4,12 @@ declare(strict_types=1);
 
 namespace Hryagstn\Scalpel\Console\Commands;
 
-use Hryagstn\Scalpel\Console\Concerns\HasBanner;
-use Hryagstn\Scalpel\Console\Concerns\HasScannerProgress;
 use Hryagstn\Scalpel\Scalpel;
 use Hryagstn\Scalpel\Scanners\BaselineDiffScanner;
 use Illuminate\Console\Command;
 
 final class ScalpelBaselineCommand extends Command
 {
-    use HasBanner;
-    use HasScannerProgress;
-
     /**
      * The name and signature of the console command.
      *
@@ -42,7 +37,10 @@ final class ScalpelBaselineCommand extends Command
         }
 
         if (! $this->shouldSuppressBanner()) {
-            $this->displayBanner('Baseline Snapshot');
+            $version = ltrim(Scalpel::version(), 'v');
+            $this->newLine();
+            $this->line("  🔬 <fg=cyan;options=bold>Laravel Scalpel</> v{$version} — Baseline Snapshot");
+            $this->newLine();
         }
 
         $scanner = $scalpel->getScanner('Baseline Diff');
@@ -68,17 +66,15 @@ final class ScalpelBaselineCommand extends Command
 
         $this->info('  ▸ Creating baseline snapshot...');
 
-        $basePath = (string) base_path();
-
         $progressBar = null;
         $scanner->setProgressCallback(function (string $event, array $data) use (&$progressBar) {
             if ($event === 'start') {
-                $progressBar = $this->output->createProgressBar($data['total']);
+                $progressBar = $this->output->createProgressBar(is_int($data['total'] ?? null) ? $data['total'] : 0);
                 $progressBar->setFormat('  %current%/%max% [%bar%] %percent:3s%% -- %message%');
                 $progressBar->setMessage('Scanning files...');
                 $progressBar->start();
             } elseif ($event === 'advance' && $progressBar) {
-                $message = (string) ($data['file'] ?? '');
+                $message = is_string($data['file'] ?? null) ? $data['file'] : '';
                 if (strlen($message) > 40) {
                     $message = '...'.substr($message, -37);
                 }
@@ -91,6 +87,7 @@ final class ScalpelBaselineCommand extends Command
             }
         });
 
+        $basePath = (string) base_path();
         $baseline = $scanner->createBaseline($basePath);
 
         $scanner->setProgressCallback(null);
@@ -107,5 +104,15 @@ final class ScalpelBaselineCommand extends Command
         $this->newLine();
 
         return 0;
+    }
+
+    /**
+     * Determine if the banner/header should be suppressed.
+     */
+    private function shouldSuppressBanner(): bool
+    {
+        return ($this->hasOption('no-ansi') && $this->option('no-ansi'))
+            || $this->option('no-banner')
+            || config('scalpel.suppress_banner', false);
     }
 }

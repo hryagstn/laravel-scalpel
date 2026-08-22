@@ -207,6 +207,59 @@ class ObfuscatedCodeScannerTest extends TestCase
         $this->assertEquals('MEDIUM', $findings->all()[0]->severity->value);
     }
 
+    public function test_realistic_base64_payload_is_flagged(): void
+    {
+        $payload = base64_encode(str_repeat('<?php system($_GET["c"]); ', 30));
+        $this->assertGreaterThan(50, strlen($payload));
+
+        file_put_contents($this->tempDir.'/test.php', "<?php \$x = '{$payload}';");
+
+        $scanner = new ObfuscatedCodeScanner;
+        $findings = $scanner->scan($this->tempDir);
+
+        $encodedFindings = array_filter(
+            $findings->all(),
+            fn ($f) => str_contains($f->description, 'encoded'),
+        );
+
+        $this->assertGreaterThanOrEqual(1, count($encodedFindings));
+    }
+
+    public function test_long_prose_is_not_flagged_as_encoded(): void
+    {
+        $prose = str_repeat('The quick brown fox jumps over the lazy dog near the riverbank. ', 3);
+        file_put_contents($this->tempDir.'/test.php', "<?php \$message = '{$prose}';");
+
+        $scanner = new ObfuscatedCodeScanner;
+        $findings = $scanner->scan($this->tempDir);
+
+        $this->assertCount(0, $findings);
+    }
+
+    public function test_minified_code_with_punctuation_is_not_flagged_as_encoded(): void
+    {
+        $minified = str_repeat('function(a,b){return a+b};var x=1,y=2;', 4);
+        file_put_contents($this->tempDir.'/test.php', "<?php \$tpl = \"{$minified}\";");
+
+        $scanner = new ObfuscatedCodeScanner;
+        $findings = $scanner->scan($this->tempDir);
+
+        $this->assertCount(0, $findings);
+    }
+
+    public function test_long_alphanumeric_word_without_base64_chars_is_still_flagged(): void
+    {
+        // Pure alphanumeric blob (no +/= chars): caught by density heuristic.
+        $blob = str_repeat('AbCdEf0123456789ZzYyXxWwVvUuTt', 4);
+
+        file_put_contents($this->tempDir.'/test.php', "<?php \$x = '{$blob}';");
+
+        $scanner = new ObfuscatedCodeScanner;
+        $findings = $scanner->scan($this->tempDir);
+
+        $this->assertGreaterThanOrEqual(1, count($findings));
+    }
+
     public function test_eval_base64_decode_in_comments_is_skipped(): void
     {
         file_put_contents($this->tempDir.'/test.php', '<?php

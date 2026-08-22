@@ -11,7 +11,7 @@ final class Finding
         public readonly string $file,
         public readonly ?int $line,
         public readonly string $description,
-        public readonly string $scanner_name,
+        public readonly string $scannerName,
     ) {}
 
     /**
@@ -22,9 +22,9 @@ final class Finding
         string $file,
         ?int $line,
         string $description,
-        string $scanner_name,
+        string $scannerName,
     ): self {
-        return new self($severity, $file, $line, $description, $scanner_name);
+        return new self($severity, $file, $line, $description, $scannerName);
     }
 
     /**
@@ -39,7 +39,7 @@ final class Finding
             'file' => $this->file,
             'line' => $this->line,
             'description' => $this->description,
-            'scanner' => $this->scanner_name,
+            'scanner' => $this->scannerName,
         ];
     }
 }

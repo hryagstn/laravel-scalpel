@@ -76,6 +76,47 @@ class HtaccessScannerTest extends TestCase
         $this->assertEquals('CRITICAL', $findings->all()[1]->severity->value);
     }
 
+    public function test_flags_auto_prepend_file_in_htaccess(): void
+    {
+        file_put_contents($this->tempDir.'/.htaccess', 'php_value auto_prepend_file /tmp/shell.txt');
+
+        $scanner = new HtaccessScanner;
+        $findings = $scanner->scan($this->tempDir);
+
+        $this->assertCount(1, $findings);
+        $this->assertEquals('CRITICAL', $findings->all()[0]->severity->value);
+        $this->assertStringContainsString('auto_prepend_file', $findings->all()[0]->description);
+    }
+
+    public function test_flags_malicious_user_ini(): void
+    {
+        @mkdir($this->tempDir.'/public', 0777, true);
+        file_put_contents($this->tempDir.'/public/.user.ini', "; PHP-FPM config\nauto_prepend_file = c99.txt\ndisable_functions = \n");
+
+        $scanner = new HtaccessScanner;
+        $findings = $scanner->scan($this->tempDir);
+
+        $this->assertGreaterThanOrEqual(2, count($findings));
+
+        $descriptions = array_map(fn ($f) => $f->description, $findings->all());
+        $this->assertNotEmpty(array_filter($descriptions, fn ($d) => str_contains((string) $d, 'auto_prepend_file')));
+
+        foreach ($findings->all() as $finding) {
+            $this->assertEquals('CRITICAL', $finding->severity->value);
+            $this->assertStringEndsWith('.user.ini', $finding->file);
+        }
+    }
+
+    public function test_ignores_benign_user_ini(): void
+    {
+        file_put_contents($this->tempDir.'/.user.ini', "upload_max_filesize = 10M\nmemory_limit = 256M\n");
+
+        $scanner = new HtaccessScanner;
+        $findings = $scanner->scan($this->tempDir);
+
+        $this->assertCount(0, $findings);
+    }
+
     public function test_flags_external_redirects(): void
     {
         file_put_contents($this->tempDir.'/.htaccess', 'RewriteRule ^(.*)$ http://attacker.com/$1 [R=301,L]');

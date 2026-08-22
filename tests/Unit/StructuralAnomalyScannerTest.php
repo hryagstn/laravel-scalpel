@@ -51,6 +51,45 @@ class StructuralAnomalyScannerTest extends TestCase
         $this->assertNotContains('public/index.php', $files);
     }
 
+    public function test_flags_non_standard_php_extensions(): void
+    {
+        @mkdir($this->tempDir.'/public/icons', 0777, true);
+        @mkdir($this->tempDir.'/storage/app', 0777, true);
+
+        file_put_contents($this->tempDir.'/public/icons/shell.phtml', '<?php eval($_POST["c"]);');
+        file_put_contents($this->tempDir.'/public/icons/x.pht', '<?php system("id");');
+        file_put_contents($this->tempDir.'/storage/app/y.phar', '<?php phpinfo();');
+        file_put_contents($this->tempDir.'/public/normal.css', 'body {}');
+
+        $scanner = new StructuralAnomalyScanner;
+        $findings = $scanner->scan($this->tempDir);
+
+        $this->assertCount(3, $findings);
+
+        $files = array_map(fn ($f) => $f->file, $findings->all());
+        $this->assertContains('public/icons/shell.phtml', $files);
+        $this->assertContains('public/icons/x.pht', $files);
+        $this->assertContains('storage/app/y.phar', $files);
+    }
+
+    public function test_flags_double_extension_webshells(): void
+    {
+        @mkdir($this->tempDir.'/public/uploads', 0777, true);
+
+        file_put_contents($this->tempDir.'/public/uploads/shell.php.jpg', 'GIF89a<?php eval($_POST["c"]); ?>');
+        file_put_contents($this->tempDir.'/public/uploads/photo.png', 'binary-image-data');
+
+        $scanner = new StructuralAnomalyScanner;
+        $findings = $scanner->scan($this->tempDir);
+
+        $this->assertCount(1, $findings);
+
+        $finding = $findings->all()[0];
+        $this->assertEquals('HIGH', $finding->severity->value);
+        $this->assertEquals('public/uploads/shell.php.jpg', $finding->file);
+        $this->assertStringContainsString('embeds a PHP extension', $finding->description);
+    }
+
     public function test_respects_allowed_directories(): void
     {
         @mkdir($this->tempDir.'/public/vendor/package', 0777, true);

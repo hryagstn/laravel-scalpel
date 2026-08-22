@@ -28,21 +28,27 @@ final class ScalpelVerifyCommand extends Command
      */
     public function handle(): int
     {
-        $file = $this->argument('file');
+        $argument = $this->argument('file');
+        $file = null;
 
-        if ($file === '-' || $file === null) {
+        if (is_string($argument)) {
+            $file = $argument;
+        } elseif (is_array($argument) && is_string($argument[0] ?? null)) {
+            $file = $argument[0];
+        }
+
+        if ($file === null || $file === '-') {
             $jsonContent = @file_get_contents('php://stdin');
         } else {
-            $filePath = is_string($file) ? $file : '';
-            if ($filePath === '' || ! file_exists($filePath)) {
-                $this->error("  ❌ File not found: {$filePath}");
+            if (! file_exists($file)) {
+                $this->error("  ❌ File not found: {$file}");
 
                 return 1;
             }
-            $jsonContent = @file_get_contents($filePath);
+            $jsonContent = @file_get_contents($file);
         }
 
-        if (! is_string($jsonContent) || trim($jsonContent) === '') {
+        if ($jsonContent === false || $jsonContent === '') {
             $this->error('  ❌ Empty or missing JSON input.');
 
             return 1;
@@ -55,7 +61,7 @@ final class ScalpelVerifyCommand extends Command
             return 1;
         }
 
-        if (! isset($data['signature'])) {
+        if (! isset($data['signature']) || ! is_string($data['signature'])) {
             $this->error('  ❌ Signature missing from JSON payload.');
 
             return 1;
@@ -66,14 +72,15 @@ final class ScalpelVerifyCommand extends Command
 
         // Rebuilt canonical JSON structure
         $canonicalJson = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+
         if ($canonicalJson === false) {
-            $this->error('  ❌ Invalid JSON payload.');
+            $this->error('  ❌ Unable to rebuild canonical JSON payload.');
 
             return 1;
         }
 
         $key = config('scalpel.signing.key');
-        if (empty($key)) {
+        if (! is_string($key) || $key === '') {
             $this->error('  ❌ Scalpel signing key is not configured.');
 
             return 1;

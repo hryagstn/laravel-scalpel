@@ -23,6 +23,7 @@ class EnvIntegrityScannerTest extends TestCase
 
     public function test_flags_missing_env_file(): void
     {
+        // No .env file created at all
         $scanner = new EnvIntegrityScanner;
         $findings = $scanner->scan($this->tempDir);
 
@@ -48,8 +49,16 @@ class EnvIntegrityScannerTest extends TestCase
             $scanner = new EnvIntegrityScanner;
             $findings = $scanner->scan($this->tempDir);
 
-            $this->assertTrue($findings->hasSeverity(Severity::HIGH));
+            $permissionFindings = array_filter(
+                $findings->all(),
+                fn ($f) => str_contains($f->description, 'world-readable'),
+            );
+
+            $this->assertGreaterThanOrEqual(1, count($permissionFindings));
+            $this->assertEquals('HIGH', array_values($permissionFindings)[0]->severity->value);
         }
+
+        @chmod($envPath, 0600);
     }
 
     public function test_flags_extra_env_keys(): void
@@ -71,10 +80,16 @@ class EnvIntegrityScannerTest extends TestCase
         $scanner = new EnvIntegrityScanner;
         $findings = $scanner->scan($this->tempDir);
 
-        $this->assertCount(1, $findings);
-        $this->assertEquals('MEDIUM', $findings->all()[0]->severity->value);
-        $this->assertStringContainsString('STRIPE_SECRET_KEY', $findings->all()[0]->description);
-        $this->assertStringContainsString('AWS_SECRET_ACCESS_KEY', $findings->all()[0]->description);
+        $extraKeyFindings = array_filter(
+            $findings->all(),
+            fn ($f) => str_contains($f->description, 'not present in .env.example'),
+        );
+
+        $this->assertCount(1, $extraKeyFindings);
+        $finding = array_values($extraKeyFindings)[0];
+        $this->assertEquals('MEDIUM', $finding->severity->value);
+        $this->assertStringContainsString('STRIPE_SECRET_KEY', $finding->description);
+        $this->assertStringContainsString('AWS_SECRET_ACCESS_KEY', $finding->description);
     }
 
     public function test_flags_public_env_file(): void
@@ -94,6 +109,78 @@ class EnvIntegrityScannerTest extends TestCase
         $this->assertContains('public/.env', $files);
     }
 
+    public function test_flags_empty_env_file(): void
+    {
+        $envPath = $this->tempDir.'/.env';
+        file_put_contents($envPath, '');
+        @chmod($envPath, 0600);
+
+        $scanner = new EnvIntegrityScanner;
+        $findings = $scanner->scan($this->tempDir);
+
+        $emptyFindings = array_filter(
+            $findings->all(),
+            fn ($f) => str_contains($f->description, 'empty'),
+        );
+
+        $this->assertGreaterThanOrEqual(1, count($emptyFindings));
+        $finding = array_values($emptyFindings)[0];
+        $this->assertEquals('HIGH', $finding->severity->value);
+    }
+
+    public function test_flags_missing_keys_vs_example(): void
+    {
+        file_put_contents($this->tempDir.'/.env.example', '
+            APP_KEY=
+            APP_ENV=
+            APP_DEBUG=
+            REDIS_HOST=
+        ');
+
+        $envPath = $this->tempDir.'/.env';
+        file_put_contents($envPath, '
+            APP_KEY=base64:1234567890=
+            APP_ENV=local
+        ');
+        @chmod($envPath, 0600);
+
+        $scanner = new EnvIntegrityScanner;
+        $findings = $scanner->scan($this->tempDir);
+
+        $missingKeyFindings = array_filter(
+            $findings->all(),
+            fn ($f) => str_contains($f->description, 'missing from .env'),
+        );
+
+        $this->assertCount(1, $missingKeyFindings);
+        $finding = array_values($missingKeyFindings)[0];
+        $this->assertEquals('LOW', $finding->severity->value);
+        $this->assertStringContainsString('APP_DEBUG', $finding->description);
+        $this->assertStringContainsString('REDIS_HOST', $finding->description);
+    }
+
+    public function test_clean_env_produces_no_findings(): void
+    {
+        file_put_contents($this->tempDir.'/.env.example', '
+            APP_KEY=
+            APP_ENV=
+            APP_DEBUG=
+        ');
+
+        $envPath = $this->tempDir.'/.env';
+        file_put_contents($envPath, '
+            APP_KEY=base64:abc123
+            APP_ENV=production
+            APP_DEBUG=false
+        ');
+        @chmod($envPath, 0600);
+
+        $scanner = new EnvIntegrityScanner;
+        $findings = $scanner->scan($this->tempDir);
+
+        $this->assertCount(0, $findings);
+    }
+
     public function test_flags_missing_app_key(): void
     {
         $envPath = $this->tempDir.'/.env';
@@ -105,7 +192,7 @@ class EnvIntegrityScannerTest extends TestCase
 
         $this->assertTrue($findings->hasSeverity(Severity::CRITICAL));
         $descriptions = array_map(fn ($f) => $f->description, $findings->all());
-        $this->assertTrue(collect($descriptions)->contains(fn ($d) => str_contains($d, 'APP_KEY is missing')));
+        $this->assertTrue(collect($descriptions)->contains(fn ($d) => str_contains((string) $d, 'APP_KEY is missing')));
     }
 
     public function test_flags_app_debug_true_in_production(): void
@@ -119,7 +206,7 @@ class EnvIntegrityScannerTest extends TestCase
 
         $this->assertTrue($findings->hasSeverity(Severity::HIGH));
         $descriptions = array_map(fn ($f) => $f->description, $findings->all());
-        $this->assertTrue(collect($descriptions)->contains(fn ($d) => str_contains($d, 'APP_DEBUG is enabled')));
+        $this->assertTrue(collect($descriptions)->contains(fn ($d) => str_contains((string) $d, 'APP_DEBUG is enabled')));
     }
 
     public function test_flags_assume_production_with_local_env(): void
@@ -135,6 +222,6 @@ class EnvIntegrityScannerTest extends TestCase
 
         $this->assertTrue($findings->hasSeverity(Severity::MEDIUM));
         $descriptions = array_map(fn ($f) => $f->description, $findings->all());
-        $this->assertTrue(collect($descriptions)->contains(fn ($d) => str_contains($d, 'APP_ENV is set to "local"')));
+        $this->assertTrue(collect($descriptions)->contains(fn ($d) => str_contains((string) $d, 'APP_ENV is set to "local"')));
     }
 }

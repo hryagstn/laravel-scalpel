@@ -88,14 +88,15 @@ class ScalpelVerifyCommandTest extends TestCase
         $this->createSandboxFile('.env', "APP_ENV=testing\nAPP_KEY=base64:1234567890=");
         $this->createSandboxFile('.env.example', "APP_ENV=\nAPP_KEY=");
 
-        // Ensure baseline diff is clean
-        $scalpel = app(Scalpel::class);
-        $scalpel->getScanner('Baseline Diff')->createBaseline(base_path());
-
+        // Enable signing BEFORE creating the baseline so the snapshot is
+        // signed and the Baseline Diff scanner stays clean.
         config([
             'scalpel.signing.enabled' => true,
             'scalpel.signing.key' => 'secret-test-key',
         ]);
+
+        $scalpel = app(Scalpel::class);
+        $scalpel->getScanner('Baseline Diff')->createBaseline(base_path());
 
         $exitCode = Artisan::call('scalpel:scan', ['--format' => 'json']);
         $this->assertSame(0, $exitCode);

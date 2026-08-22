@@ -41,14 +41,30 @@ class ObfuscatedCodeScanner extends BaseScanner
         $finder = $this->createFinder($basePath);
         $finder->name('*.php');
 
-        foreach ($finder as $file) {
+        // Materialize the file list so progress can report a total upfront
+        $filesArray = iterator_to_array($finder, false);
+        $totalFiles = count($filesArray);
+        $this->notifyProgress('start', ['total' => $totalFiles]);
+
+        $processed = 0;
+
+        foreach ($filesArray as $file) {
             $realPath = $file->getRealPath();
             if ($realPath === false) {
                 continue;
             }
             $relativePath = $this->relativePath($realPath, $basePath);
             $this->scanFile($realPath, $relativePath, $patterns, $findings);
+
+            $processed++;
+            $this->notifyProgress('advance', [
+                'current' => $processed,
+                'total' => $totalFiles,
+                'file' => $relativePath,
+            ]);
         }
+
+        $this->notifyProgress('finish');
 
         return $findings;
     }
@@ -105,7 +121,7 @@ class ObfuscatedCodeScanner extends BaseScanner
                             file: $relativePath,
                             line: $lineNumber,
                             description: $patternDef['description'],
-                            scanner_name: $this->name(),
+                            scannerName: $this->name(),
                         ));
                     }
                 }
@@ -133,7 +149,7 @@ class ObfuscatedCodeScanner extends BaseScanner
                 file: $relativePath,
                 line: $lineNumber,
                 description: 'Variable assigned a dangerous function name — potential variable function call to evade detection.',
-                scanner_name: $this->name(),
+                scannerName: $this->name(),
             ));
 
             return;
@@ -147,7 +163,7 @@ class ObfuscatedCodeScanner extends BaseScanner
                         file: $relativePath,
                         line: $lineNumber,
                         description: "Variable function call detected with dangerous function '{$func}'.",
-                        scanner_name: $this->name(),
+                        scannerName: $this->name(),
                     ));
 
                     return;
@@ -172,7 +188,7 @@ class ObfuscatedCodeScanner extends BaseScanner
                 file: $relativePath,
                 line: $lineNumber,
                 description: sprintf('Excessive chr() function chaining detected (%d calls in one line) — common obfuscation technique.', $count),
-                scanner_name: $this->name(),
+                scannerName: $this->name(),
             ));
         }
     }
@@ -189,6 +205,7 @@ class ObfuscatedCodeScanner extends BaseScanner
         /** @var int $threshold */
         $threshold = config('scalpel.long_string_threshold', 500);
 
+        // Extract string literals from the line
         if (preg_match_all('/[\'"]([^\'"]{'.$threshold.',})[\'"]/', $line, $matches)) {
             foreach ($matches[1] as $stringContent) {
                 if ($this->looksEncoded($stringContent)) {
@@ -200,7 +217,7 @@ class ObfuscatedCodeScanner extends BaseScanner
                             'Suspiciously long encoded string detected (%d chars). May contain obfuscated payload.',
                             strlen($stringContent),
                         ),
-                        scanner_name: $this->name(),
+                        scannerName: $this->name(),
                     ));
                 }
             }
@@ -219,7 +236,7 @@ class ObfuscatedCodeScanner extends BaseScanner
                         strlen($trimmedLine),
                         $nonSpaceRatio * 100,
                     ),
-                    scanner_name: $this->name(),
+                    scannerName: $this->name(),
                 ));
             }
         }
@@ -240,26 +257,50 @@ class ObfuscatedCodeScanner extends BaseScanner
             return true;
         }
 
+        // Laravel config files use "|"-prefixed lines inside /* */ blocks.
+        // Treat them as comment continuations to avoid false positives on
+        // inline code references such as `storage:link`.
+        if (str_starts_with($trimmed, '|')) {
+            return true;
+        }
+
         return false;
     }
 
     /**
      * Determine if a string looks like encoded content (base64, hex, etc).
+     *
+     * Callers guarantee the content already exceeds the configured minimum
+     * length, so no length checks are needed here.
      */
     private function looksEncoded(string $content): bool
     {
-        if (preg_match('/^[A-Za-z0-9+\/=]{100,}$/', $content) === 1) {
+        // Hex pattern: exclusively hexadecimal characters with even length
+        // (each byte is encoded as two characters).
+        if (preg_match('/^[0-9a-fA-F]+$/', $content) === 1 && strlen($content) % 2 === 0) {
             return true;
         }
 
-        if (preg_match('/^[0-9a-fA-F]{100,}$/', $content) === 1) {
+        // Base64 pattern: allowed charset AND at least one structural base64
+        // character (+, / or =). Requiring a structural character avoids
+        // flagging long plain words that happen to be purely alphanumeric.
+        if (
+            preg_match('/^[A-Za-z0-9+\/=]+$/', $content) === 1
+            && preg_match('/[+\/=]/', $content) === 1
+        ) {
             return true;
         }
 
+        // Very dense alphanumeric blob without spaces or punctuation —
+        // likely a custom-encoded payload. The threshold is deliberately
+        // strict (95%) so normal prose or minified code (which contain
+        // punctuation) is not flagged.
         $alphanumCount = preg_match_all('/[A-Za-z0-9]/', $content);
-        if (strlen($content) > 0) {
+
+        if ($alphanumCount !== false) {
             $ratio = $alphanumCount / strlen($content);
-            if ($ratio > 0.85) {
+
+            if ($ratio > 0.95) {
                 return true;
             }
         }
@@ -307,6 +348,21 @@ class ObfuscatedCodeScanner extends BaseScanner
                 'pattern' => '/assert\s*\(\s*(\$|[\'\"]\s*\$)/i',
                 'severity' => Severity::HIGH,
                 'description' => 'Dynamic assert() with variable argument — can execute arbitrary code.',
+            ],
+            'backtick_operator' => [
+                'pattern' => '%`[^`]+`%',
+                'severity' => Severity::HIGH,
+                'description' => 'Backtick operator detected — executes shell commands (alias of shell_exec).',
+            ],
+            'variable_variables' => [
+                'pattern' => '/\$\$[a-zA-Z_]/',
+                'severity' => Severity::MEDIUM,
+                'description' => 'Variable variables ($$var) detected — frequently used to obfuscate function calls.',
+            ],
+            'extract_input' => [
+                'pattern' => '/extract\s*\(\s*\$_(GET|POST|REQUEST|COOKIE|FILES|SERVER)/i',
+                'severity' => Severity::HIGH,
+                'description' => 'extract() over request input — allows attackers to overwrite arbitrary variables.',
             ],
             'preg_replace_e' => [
                 'pattern' => '/preg_replace\s*\(\s*[\'\"\/].*\/e[\'"]/i',

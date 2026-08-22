@@ -30,7 +30,7 @@ class EnvIntegrityScanner extends BaseScanner
                 file: '.env',
                 line: null,
                 description: 'The .env file is missing. The application may not function correctly without environment configuration.',
-                scanner_name: $this->name(),
+                scannerName: $this->name(),
             ));
 
             // Still check for .env in public/ even if root .env is missing
@@ -39,15 +39,47 @@ class EnvIntegrityScanner extends BaseScanner
             return $findings;
         }
 
-        // Check 2: World-readable permissions
-        $this->checkPermissions($envPath, $findings);
+        // Check 2: Empty or unreadable .env file (truncation is a common
+        // post-compromise tactic to silence error reporting)
+        $envSize = @filesize($envPath);
 
-        // Check 3: Extra keys in .env not in .env.example
-        if (file_exists($envExamplePath)) {
-            $this->checkExtraKeys($envPath, $envExamplePath, $findings);
+        if ($envSize === 0) {
+            $findings->add(Finding::make(
+                severity: Severity::HIGH,
+                file: '.env',
+                line: null,
+                description: 'The .env file is empty. It may have been truncated to disable error reporting or cover tracks.',
+                scannerName: $this->name(),
+            ));
+
+            $this->checkPublicEnv($basePath, $findings);
+
+            return $findings;
         }
 
-        // Check 4: .env file in public/ directory
+        if (! is_readable($envPath)) {
+            $findings->add(Finding::make(
+                severity: Severity::HIGH,
+                file: '.env',
+                line: null,
+                description: 'The .env file exists but is not readable by the current process.',
+                scannerName: $this->name(),
+            ));
+        }
+
+        // Check 3: World-readable permissions
+        $this->checkPermissions($envPath, $findings);
+
+        // Check 4: Extra keys in .env not in .env.example
+        if (file_exists($envExamplePath)) {
+            $this->checkExtraKeys($envPath, $envExamplePath, $findings);
+
+            // Check 5: Keys defined in .env.example but missing from .env
+            // (deletion of required keys may indicate tampering)
+            $this->checkMissingKeys($envPath, $envExamplePath, $findings);
+        }
+
+        // Check 6: .env file in public/ directory
         $this->checkPublicEnv($basePath, $findings);
 
         // Check 5: Security configuration checks (APP_DEBUG, APP_KEY, APP_ENV)
@@ -80,7 +112,7 @@ class EnvIntegrityScanner extends BaseScanner
                     'The .env file is world-readable (permissions: %s). This exposes sensitive credentials to all system users.',
                     substr(sprintf('%o', $perms), -4),
                 ),
-                scanner_name: $this->name(),
+                scannerName: $this->name(),
             ));
         }
     }
@@ -115,7 +147,44 @@ class EnvIntegrityScanner extends BaseScanner
                 $keyList,
                 $remaining,
             ),
-            scanner_name: $this->name(),
+            scannerName: $this->name(),
+        ));
+    }
+
+    /**
+     * Compare .env keys against .env.example to find keys that were defined
+     * in the example but are missing from the actual .env file. Deleting
+     * required keys is a common post-compromise tactic (e.g. removing
+     * APP_KEY or debug-related settings).
+     */
+    private function checkMissingKeys(
+        string $envPath,
+        string $envExamplePath,
+        FindingCollection $findings,
+    ): void {
+        $envKeys = $this->parseEnvKeys($envPath);
+        $exampleKeys = $this->parseEnvKeys($envExamplePath);
+
+        $missingKeys = array_diff($exampleKeys, $envKeys);
+
+        if (empty($missingKeys)) {
+            return;
+        }
+
+        $keyList = implode(', ', array_slice($missingKeys, 0, 10));
+        $remaining = count($missingKeys) > 10 ? sprintf(' (and %d more)', count($missingKeys) - 10) : '';
+
+        $findings->add(Finding::make(
+            severity: Severity::LOW,
+            file: '.env',
+            line: null,
+            description: sprintf(
+                'Found %d key(s) defined in .env.example but missing from .env: %s%s. Verify these were not removed to alter application behavior.',
+                count($missingKeys),
+                $keyList,
+                $remaining,
+            ),
+            scannerName: $this->name(),
         ));
     }
 
@@ -132,7 +201,7 @@ class EnvIntegrityScanner extends BaseScanner
                 file: 'public/.env',
                 line: null,
                 description: 'A .env file exists in the public/ directory. This file is web-accessible and exposes all environment secrets.',
-                scanner_name: $this->name(),
+                scannerName: $this->name(),
             ));
         }
     }
@@ -158,7 +227,7 @@ class EnvIntegrityScanner extends BaseScanner
                 file: '.env',
                 line: null,
                 description: 'APP_KEY is missing or empty in .env. Encryption and session security are compromised.',
-                scanner_name: $this->name(),
+                scannerName: $this->name(),
             ));
         }
 
@@ -169,7 +238,7 @@ class EnvIntegrityScanner extends BaseScanner
                 file: '.env',
                 line: null,
                 description: 'APP_DEBUG is enabled (true) in a production environment. Detailed exception stack traces may be exposed publicly.',
-                scanner_name: $this->name(),
+                scannerName: $this->name(),
             ));
         }
 
@@ -180,7 +249,7 @@ class EnvIntegrityScanner extends BaseScanner
                 file: '.env',
                 line: null,
                 description: 'APP_ENV is set to "local" while running under production security checks.',
-                scanner_name: $this->name(),
+                scannerName: $this->name(),
             ));
         }
     }

@@ -50,6 +50,40 @@ abstract class BaseScanner implements ScannerInterface
     }
 
     /**
+     * Fallback list when scalpel.suspicious_php_extensions is not configured.
+     *
+     * @var string[]
+     */
+    private const DEFAULT_PHP_EXTENSIONS = [
+        'php',
+        'pht',
+        'phtm',
+        'phtml',
+        'phar',
+        'php3',
+        'php4',
+        'php5',
+        'php7',
+    ];
+
+    /**
+     * Get the configured list of executable PHP extensions.
+     *
+     * Attackers use lesser-known extensions (.phtml, .pht, .phar, .php5)
+     * because servers are sometimes configured to execute them while
+     * scanners only look for .php.
+     *
+     * @return string[]
+     */
+    protected function getSuspiciousPhpExtensions(): array
+    {
+        /** @var string[] $extensions */
+        $extensions = config('scalpel.suspicious_php_extensions', self::DEFAULT_PHP_EXTENSIONS);
+
+        return $extensions;
+    }
+
+    /**
      * Get paths excluded from content scanners (obfuscated, structural, htaccess).
      * These paths are still monitored by BaselineDiffScanner via hash comparison.
      *

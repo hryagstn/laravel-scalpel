@@ -93,7 +93,22 @@ To set up the development environment, you will need:
 We use PHPUnit for testing. Before submitting a pull request, make sure all tests pass:
 
 ```bash
-vendor/bin/phpunit
+composer test
+```
+
+### Code Style & Static Analysis
+
+Before submitting a pull request, also make sure the code style and static analysis checks pass:
+
+```bash
+# Check code style (Laravel Pint)
+composer lint
+
+# Automatically fix code style issues
+composer lint:fix
+
+# Run PHPStan static analysis
+composer analyse
 ```
 
 If you are developing a new scanner or rule:

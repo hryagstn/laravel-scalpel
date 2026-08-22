@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Hryagstn\Scalpel\Tests\Feature;
 
+use Hryagstn\Scalpel\Events\ScanFinished;
 use Hryagstn\Scalpel\Scalpel;
 use Hryagstn\Scalpel\Scanners\BaselineDiffScanner;
 use Hryagstn\Scalpel\Tests\TestCase;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Storage;
 
 class ScalpelScanCommandTest extends TestCase
@@ -119,6 +121,138 @@ class ScalpelScanCommandTest extends TestCase
 
         $this->artisan('scalpel:scan --production')
             ->expectsOutputToContain('APP_DEBUG is enabled')
+            ->assertExitCode(1);
+    }
+
+    /**
+     * Regression test: the htaccess alias previously resolved to '.htaccess',
+     * which never matched the scanner's name() ('Htaccess'), silently skipping it.
+     */
+    public function test_scan_command_only_htaccess_flag_runs_htaccess_scanner(): void
+    {
+        $this->createSandboxFile('.env', "APP_ENV=testing\nAPP_KEY=base64:1234567890=");
+
+        $this->artisan('scalpel:scan --only=htaccess')
+            ->expectsOutputToContain('Running scanner: Htaccess')
+            ->doesntExpectOutput('Running scanner: Structural Anomaly')
+            ->doesntExpectOutput('Running scanner: Obfuscated Code')
+            ->assertExitCode(0);
+    }
+
+    public function test_scan_command_only_flag_accepts_every_alias(): void
+    {
+        $this->createSandboxFile('.env', "APP_ENV=testing\nAPP_KEY=base64:1234567890=");
+        $this->createSandboxFile('.env.example', "APP_ENV=\nAPP_KEY=");
+        $this->createBaselineProgrammatically();
+
+        foreach (Scalpel::SCANNER_ALIASES as $alias => $scannerClass) {
+            $scanner = new $scannerClass;
+
+            $this->artisan("scalpel:scan --only={$alias}")
+                ->expectsOutputToContain("Running scanner: {$scanner->name()}")
+                ->assertExitCode(0);
+        }
+    }
+
+    public function test_scanner_aliases_cover_all_default_scanners(): void
+    {
+        $aliasedClasses = array_values(Scalpel::SCANNER_ALIASES);
+        $defaultClasses = array_map(
+            fn ($scanner) => $scanner::class,
+            Scalpel::getDefaultScanners(),
+        );
+
+        sort($aliasedClasses);
+        sort($defaultClasses);
+
+        $this->assertSame($defaultClasses, $aliasedClasses);
+    }
+
+    public function test_scan_command_warns_on_unknown_scanner_alias(): void
+    {
+        $this->createSandboxFile('.env', "APP_ENV=testing\nAPP_KEY=base64:1234567890=");
+
+        $this->artisan('scalpel:scan --only=nonexistent')
+            ->expectsOutputToContain('Unknown scanner alias: nonexistent')
+            ->assertExitCode(0);
+    }
+
+    public function test_scan_command_returns_exit_code_2_for_medium_or_low_findings_only(): void
+    {
+        // No baseline snapshot exists — BaselineDiffScanner reports a MEDIUM finding.
+        $this->createSandboxFile('.env', "APP_ENV=testing\nAPP_KEY=base64:1234567890=");
+
+        $this->artisan('scalpel:scan')->assertExitCode(2);
+    }
+
+    public function test_scan_command_github_format_outputs_annotations(): void
+    {
+        $this->createSandboxFile('.env', "APP_ENV=testing\nAPP_KEY=base64:1234567890=");
+        $this->createSandboxFile('public/backdoor.php', '<?php eval(base64_decode($_POST["cmd"]));');
+
+        $exitCode = Artisan::call('scalpel:scan', ['--format' => 'github']);
+        $this->assertSame(1, $exitCode);
+
+        $output = Artisan::output();
+        $this->assertStringContainsString('::error', $output);
+        $this->assertStringContainsString('file=', $output);
+        $this->assertStringContainsString('backdoor.php', $output);
+    }
+
+    public function test_scan_command_dispatches_scan_finished_event(): void
+    {
+        Event::fake([ScanFinished::class]);
+
+        $this->createSandboxFile('.env', "APP_ENV=testing\nAPP_KEY=base64:1234567890=");
+        $this->createBaselineProgrammatically();
+
+        $this->artisan('scalpel:scan')->assertExitCode(0);
+
+        Event::assertDispatched(ScanFinished::class);
+    }
+
+    public function test_scan_command_fail_on_medium_fails_for_medium_findings(): void
+    {
+        // Missing baseline produces a single MEDIUM finding.
+        $this->createSandboxFile('.env', "APP_ENV=testing\nAPP_KEY=base64:1234567890=");
+
+        // Default threshold (HIGH): MEDIUM-only findings are not a failure.
+        $this->artisan('scalpel:scan')->assertExitCode(2);
+
+        // Explicit MEDIUM threshold: now it is a failure.
+        $this->artisan('scalpel:scan --fail-on=MEDIUM')->assertExitCode(1);
+
+        // LOW threshold: also a failure.
+        $this->artisan('scalpel:scan --fail-on=LOW')->assertExitCode(1);
+    }
+
+    public function test_scan_command_warns_on_invalid_fail_on_value(): void
+    {
+        $this->createSandboxFile('.env', "APP_ENV=testing\nAPP_KEY=base64:1234567890=");
+        $this->createBaselineProgrammatically();
+
+        // Invalid value falls back to HIGH — clean scan still exits 0.
+        $this->artisan('scalpel:scan --fail-on=BOGUS')
+            ->expectsOutputToContain("Unknown --fail-on value 'BOGUS'")
+            ->assertExitCode(0);
+    }
+
+    public function test_include_vendor_flag_scans_vendor_directory(): void
+    {
+        $this->createSandboxFile('.env', "APP_ENV=testing\nAPP_KEY=base64:1234567890=");
+        $this->createSandboxFile('.env.example', "APP_ENV=\nAPP_KEY=");
+        $payload = base64_encode('<?php system($_GET["c"]); ?>');
+        $this->createSandboxFile('vendor/evil/pkg/backdoor.php', "<?php eval(base64_decode('{$payload}'));");
+        $this->createBaselineProgrammatically();
+
+        // Without the flag, vendor/ is excluded from content scanning.
+        $this->artisan('scalpel:scan --only=obfuscated')
+            ->doesntExpectOutput('backdoor.php')
+            ->assertExitCode(0);
+
+        // With the flag, the planted backdoor inside vendor/ is detected.
+        $this->artisan('scalpel:scan --only=obfuscated --include-vendor')
+            ->expectsOutputToContain('backdoor.php')
             ->assertExitCode(1);
     }
 

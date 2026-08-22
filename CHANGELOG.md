@@ -5,6 +5,29 @@ All notable changes to `laravel-scalpel` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-08-22
+
+### Added
+- **Baseline tamper protection:** baseline snapshots are now HMAC-signed when output signing is enabled. `scalpel:diff` verifies the signature before trusting the snapshot — a regenerated/tampered baseline is reported as CRITICAL.
+- **`.user.ini` scanning:** the Htaccess scanner now also detects dangerous directives in `.user.ini` files (the PHP-FPM persistence vector), including `auto_prepend_file` / `auto_append_file`.
+- **Non-standard PHP extension detection:** the Structural Anomaly Scanner now flags `.phtml`, `.pht`, `.phar`, `.php5`, etc. (configurable via new `suspicious_php_extensions` key), plus double-extension upload bypasses such as `shell.php.jpg`.
+- **Env Integrity enhancements:** detects empty or unreadable `.env` files, world-readable `.env` permissions, injected keys (present in `.env` but not `.env.example`) and removed keys (present in `.env.example` but missing from `.env`).
+- **New obfuscation patterns** (all toggleable): `eval_direct_input`, `backtick_operator`, `variable_variables`, `extract_input`.
+- **`ScanFinished` event** dispatched by `scalpel:scan` and `scalpel:diff` for native Laravel alerting integrations (Mail/Slack/Telegram listeners).
+- **`--format=github` output** producing GitHub Actions annotations (`::error` / `::warning` / `::notice`) that render inline on pull requests.
+- **`--include-vendor` flag** to include `vendor/` in content scanning on demand (previously teased in config comments).
+- **`--fail-on=<severity>` flag** to control which severity constitutes a failing exit code (default: `HIGH`).
+- Baseline snapshots now embed a `schema_version` field for future structure migrations.
+
+### Fixed
+- Exit codes now match documented behaviour in all cases: missing baseline in `scalpel:diff` returns `2` (MEDIUM finding) instead of `1`.
+
+### Changed
+- Tightened encoded-string heuristics in the Obfuscated Code Scanner to reduce false positives on long prose and minified code (hex must be even-length; base64 requires structural characters; density threshold raised from 85% to 95%).
+- Comment-line detection now recognizes `|`-prefixed lines used inside Laravel-style config docblocks, avoiding false positives on inline code references.
+- Added a test coverage CI job, Renovate config, and Codecov badge.
+- Published config now includes the previously implicit `suppress_banner` key.
+
 ## [1.6.1] - 2026-07-29
 
 ### Documentation

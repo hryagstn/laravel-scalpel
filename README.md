@@ -10,6 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/hryagstn/laravel-scalpel/actions"><img src="https://img.shields.io/github/actions/workflow/status/hryagstn/laravel-scalpel/tests.yml?branch=main&style=flat-square" alt="Build Status"></a>
+  <a href="https://codecov.io/gh/hryagstn/laravel-scalpel"><img src="https://img.shields.io/codecov/c/github/hryagstn/laravel-scalpel/main?style=flat-square" alt="Code Coverage"></a>
   <a href="https://packagist.org/packages/hryagstn/laravel-scalpel"><img src="https://img.shields.io/packagist/v/hryagstn/laravel-scalpel.svg?style=flat-square" alt="Latest Version on Packagist"></a>
   <a href="https://packagist.org/packages/hryagstn/laravel-scalpel"><img src="https://img.shields.io/packagist/php-v/hryagstn/laravel-scalpel?style=flat-square" alt="PHP Version"></a>
   <a href="https://packagist.org/packages/hryagstn/laravel-scalpel"><img src="https://img.shields.io/badge/laravel-10.x%20|%2011.x%20|%2012.x%20|%2013.x-blue?style=flat-square" alt="Laravel Version"></a>
@@ -137,23 +138,35 @@ php artisan scalpel:scan --only=structural,obfuscated
 
 # Output results as JSON (for machine consumption)
 php artisan scalpel:scan --format=json
+
+# Output GitHub Actions annotations (renders inline on PRs)
+php artisan scalpel:scan --format=github
+
+# Also scan vendor/ for obfuscated code (slower, recommended after deployments)
+php artisan scalpel:scan --include-vendor
+
+# Treat any MEDIUM finding as a hard failure
+php artisan scalpel:scan --fail-on=MEDIUM
 ```
 
 **Options:**
 
-| Option     | Description                                                                 |
-|------------|-----------------------------------------------------------------------------|
-| `--only`   | Comma-separated list of scanners to run: `structural`, `obfuscated`, `htaccess`, `env` |
-| `--format` | Output format: `table` (default) or `json`                                 |
-| `--fast`   | Enable metadata-based fast scan (Deferred Hashing) for this execution.      |
+| Option            | Description                                                                 |
+|-------------------|-----------------------------------------------------------------------------|
+| `--only`          | Comma-separated list of scanners to run: `structural`, `obfuscated`, `htaccess`, `baseline`, `env` |
+| `--format`        | Output format: `table` (default), `json` or `github`                        |
+| `--fast`          | Enable metadata-based fast scan (Deferred Hashing) for this execution.      |
+| `--include-vendor`| Include the `vendor/` directory in content scanning (slower).               |
+| `--fail-on`       | Minimum severity that constitutes failure: `CRITICAL`, `HIGH` (default), `MEDIUM` or `LOW`. |
+| `--no-banner`     | Suppress the banner/header.                                                 |
 
 **Exit codes:**
 
-| Code | Meaning                                      |
-|------|----------------------------------------------|
-| `0`  | No findings (clean)                          |
-| `1`  | Findings detected (CRITICAL or HIGH)         |
-| `2`  | Findings detected (MEDIUM or LOW only)       |
+| Code | Meaning                                                        |
+|------|----------------------------------------------------------------|
+| `0`  | No findings (clean)                                            |
+| `1`  | Findings detected at or above the `--fail-on` threshold        |
+| `2`  | Findings detected below the threshold                          |
 
 ---
 
@@ -194,8 +207,9 @@ php artisan scalpel:diff --format=json
 
 | Option     | Description                                    |
 |------------|------------------------------------------------|
-| `--format` | Output format: `table` (default) or `json`     |
+| `--format` | Output format: `table` (default), `json` or `github` |
 | `--fast`   | Enable metadata-based fast scan (Deferred Hashing) for this execution. |
+| `--fail-on`| Minimum severity that constitutes failure: `CRITICAL`, `HIGH` (default), `MEDIUM` or `LOW`. |
 
 **Exit codes:** Same as `scalpel:scan`.
 
@@ -207,11 +221,13 @@ Laravel Scalpel ships with five independent scanners. Each focuses on a specific
 
 ### Structural Anomaly Scanner
 
-Detects PHP files in directories where they should never exist — `public/`, `storage/`, `bootstrap/cache/`, and any other paths you define as "non-PHP zones."
+Detects PHP files in directories where they should never exist — `public/`, `storage/`, and any other paths you define as "non-PHP zones."
 
 Attackers commonly drop webshells into public-facing directories disguised as image folders (e.g., `public/icons/shell.php`). This scanner catches them.
 
-- Scans all configured `non_php_zones` for `.php` files
+- Scans all configured `non_php_zones` for PHP files
+- Detects lesser-known executable extensions (`.phtml`, `.pht`, `.phar`, `.php5`, ...) that servers are sometimes configured to execute while scanners only look for `.php` — configurable via `suspicious_php_extensions`
+- Detects double-extension upload bypasses (e.g. `shell.php.jpg`)
 - Automatically excludes known legitimate files (`public/index.php`) and directories (`public/vendor/`)
 - Configurable allow-lists for both files and directories
 
@@ -226,8 +242,13 @@ Detects common PHP obfuscation patterns used in backdoors and webshells. Scans a
 | `eval(str_rot13)`      | ROT13 obfuscation with eval                         | CRITICAL |
 | `eval(gzuncompress)`   | Compressed payload execution (variant)              | CRITICAL |
 | `eval(gzdecode)`       | Compressed payload execution (variant)              | CRITICAL |
+| `eval($_GET/POST/...)` | eval over raw request input                         | CRITICAL |
+| Backtick operator      | `` `cmd` `` shell execution alias                   | HIGH     |
+| `create_function()`    | Deprecated function commonly abused for injection   | HIGH     |
 | `assert()` with vars   | Dynamic code execution via assert                   | HIGH     |
+| `extract()` on input   | Variable overwrite from request input               | HIGH     |
 | Variable functions     | `$var()` style dynamic function calls               | MEDIUM   |
+| Variable variables     | `$$var` style indirection to hide calls             | MEDIUM   |
 | `preg_replace` `/e`    | Code execution via deprecated regex modifier        | HIGH     |
 | Long encoded strings   | Suspiciously long base64/hex strings (≥500 chars)   | MEDIUM   |
 
@@ -237,10 +258,13 @@ Each pattern can be individually toggled in the configuration.
 
 Scans all `.htaccess` files in your project for dangerous directives that could allow execution of non-PHP scripts. Attackers often modify `.htaccess` to register Python, Perl, or CGI handlers, enabling them to run arbitrary scripts through the web server.
 
+Also scans `.user.ini` files — the PHP-FPM equivalent of `.htaccess` PHP directives, and a classic persistence vector (`auto_prepend_file = shell.txt` executes the attacker's file with every request).
+
 Detects:
 - `AddHandler` directives mapping to dangerous script types
 - `AddType` directives mapping to dangerous MIME types
 - Custom handler registrations for `cgi-script`, `python-program`, `perl-script`, etc.
+- Dangerous PHP directives: `allow_url_include`, `auto_prepend_file`, `auto_append_file`, emptied `disable_functions`, and more
 
 ### Baseline Diff Scanner
 
@@ -253,14 +277,22 @@ Creates a cryptographic snapshot of your entire project filesystem and detects c
 
 Baseline snapshots exclude volatile directories like `storage/logs/`, `storage/framework/cache/`, and other paths configured in `baseline_excluded_paths`.
 
+**Tamper protection:** when output signing is enabled (`SCALPEL_SIGNING_ENABLED`), baseline snapshots are HMAC-signed. `scalpel:diff` verifies the signature before trusting the snapshot — a baseline regenerated by an attacker to conceal a planted backdoor is reported as CRITICAL.
+
+> **Important:** enable signing **before** creating your first baseline so the snapshot is signed from the start. An unsigned baseline is flagged once signing is enabled.
+
 ### Env Integrity Scanner
 
-Verifies the existence and basic integrity of your `.env` file. Attackers sometimes delete or truncate the `.env` file to disable error reporting, remove debug information, or reset application keys.
+Verifies the existence and integrity of your `.env` file. Attackers sometimes delete, truncate, or weaken the `.env` file to disable error reporting, remove debug information, or reset application keys.
 
 Checks:
 - `.env` file exists
-- `.env` file is not empty
+- `.env` file is not empty (truncation is a common cover-your-tracks tactic)
 - `.env` file is readable
+- `.env` is not world-readable (permission hardening)
+- No `.env` file inside `public/`
+- Keys in `.env` not present in `.env.example` (possible injected keys)
+- Keys in `.env.example` missing from `.env` (possible tampering)
 
 ---
 
@@ -276,7 +308,6 @@ Directories where PHP files should not exist. Relative to the project root.
 'non_php_zones' => [
     'public',
     'storage',
-    'bootstrap/cache',
 ],
 ```
 
@@ -297,18 +328,49 @@ Subdirectories within non-PHP zones where PHP files are expected (e.g., publishe
 ```php
 'structural_allowed_directories' => [
     'public/vendor',
+    'storage/framework/views',
+    'storage/framework/cache',
 ],
 ```
 
 ### `excluded_paths`
 
-Paths to exclude from **all** scanners. Relative to the project root.
+Paths to exclude from **all** scanners including baseline diff. Relative to the project root.
 
 ```php
 'excluded_paths' => [
-    'vendor',
     'node_modules',
     '.git',
+],
+```
+
+> **Note:** `vendor/` is intentionally NOT here. It is excluded from content
+> scanners via `content_scan_excluded_paths` but is still monitored by
+> BaselineDiffScanner via hash comparison to detect unauthorized modifications
+> to installed packages.
+
+### `content_scan_excluded_paths`
+
+Paths excluded from content scanners only (`ObfuscatedCodeScanner`, `StructuralAnomalyScanner`, `HtaccessScanner`) for performance reasons.
+
+These paths are still monitored by `BaselineDiffScanner` via SHA-256 hash comparison. If an attacker plants a backdoor in `vendor/`, the baseline diff will detect the new or modified file even though the content scanner does not scan it on every run.
+
+```php
+'content_scan_excluded_paths' => [
+    'vendor',
+    'bootstrap/cache',
+],
+```
+
+> To also scan `vendor/` for obfuscated code on demand: `php artisan scalpel:scan --include-vendor`.
+
+### `suspicious_php_extensions`
+
+File extensions treated as executable PHP by the Structural Anomaly Scanner, and rated HIGH when appearing as new files in baseline diffs. Also used to detect double-extension upload bypasses (`shell.php.jpg`).
+
+```php
+'suspicious_php_extensions' => [
+    'php', 'pht', 'phtm', 'phtml', 'phar', 'php3', 'php4', 'php5', 'php7',
 ],
 ```
 
@@ -324,6 +386,11 @@ Toggle individual obfuscation detection patterns on or off.
     'eval_gzuncompress'   => true,
     'eval_gzdecode'       => true,
     'assert_dynamic'      => true,
+    'eval_direct_input'   => true,
+    'backtick_operator'   => true,
+    'create_function'     => true,
+    'variable_variables'  => true,
+    'extract_input'       => true,
     'variable_functions'  => true,
     'preg_replace_e'      => true,
     'long_encoded_string' => true,
@@ -357,7 +424,9 @@ Script handlers and MIME types that are flagged when found in `.htaccess` direct
 
 ### `baseline_excluded_paths`
 
-Additional paths excluded from baseline snapshots and diff comparisons (on top of `excluded_paths`).
+Additional paths excluded from baseline snapshots and diff comparisons (on top of `excluded_paths`). These are high-churn paths that change frequently during normal operation.
+
+`bootstrap/cache` is intentionally NOT here — it is a high-value target for attackers who want to inject malicious service providers, so changes there are always reported.
 
 ```php
 'baseline_excluded_paths' => [
@@ -365,7 +434,9 @@ Additional paths excluded from baseline snapshots and diff comparisons (on top o
     'storage/framework/cache',
     'storage/framework/sessions',
     'storage/framework/views',
+    'storage/app/scalpel',
     'storage/app/private/scalpel',
+    'storage/app',
 ],
 ```
 
@@ -377,12 +448,30 @@ Where the baseline snapshot JSON file is stored, relative to `storage/app/privat
 'baseline_path' => 'scalpel/baseline.json',
 ```
 
+### `baseline_fast_scan`
+
+When enabled, Scalpel compares a file's size and modified time (mtime) against the baseline before calculating its SHA-256 hash. If they match, hash computation is skipped — drastically improving performance at the cost of protection against sophisticated "timestomping" attacks.
+
+Default: `false` (**strict mode**) for maximum security. Enable per-run with the `--fast` CLI flag or via environment:
+
+```php
+'baseline_fast_scan' => env('SCALPEL_BASELINE_FAST_SCAN', false),
+```
+
 ### `severity_threshold`
 
 Minimum severity level to include in results. Findings below this level are silently filtered out. Options: `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`.
 
 ```php
 'severity_threshold' => 'LOW',
+```
+
+### `suppress_banner`
+
+Hide the Laravel Scalpel banner from command output. Useful for cron jobs and clean CI logs. The banner is always suppressed automatically for `--format=json` and `--format=github`.
+
+```php
+'suppress_banner' => env('SCALPEL_SUPPRESS_BANNER', false),
 ```
 
 ---
@@ -426,6 +515,30 @@ jobs:
 ```
 
 > **Tip:** Store a baseline snapshot in your repository (or generate it during deployment) so `scalpel:diff` can detect unauthorized post-deployment changes.
+
+## 📡 Laravel Events
+
+Every `scalpel:scan` and `scalpel:diff` run dispatches a `Hryagstn\Scalpel\Events\ScanFinished` event containing the findings. This makes it easy to wire up alerting channels natively — Mail, Slack, Telegram, webhooks — without shelling out or parsing JSON.
+
+```php
+use Hryagstn\Scalpel\Events\ScanFinished;
+use Illuminate\Support\Facades\Event;
+
+Event::listen(ScanFinished::class, function (ScanFinished $event) {
+    if ($event->findings->hasCriticalOrHigh()) {
+        // Notify your team...
+        Mail::to('security@example.com')->send(new ScalpelAlert($event->findings));
+    }
+});
+```
+
+The event provides:
+
+| Property      | Type                | Description                                            |
+|---------------|---------------------|--------------------------------------------------------|
+| `$findings`   | `FindingCollection` | Threshold-filtered findings of the run                  |
+| `$context`    | `string`            | `'scan'` or `'diff'` — which command produced the findings |
+| `$durationMs` | `float`             | Total wall-clock duration of the run in milliseconds    |
 
 ## Known False Positives
 

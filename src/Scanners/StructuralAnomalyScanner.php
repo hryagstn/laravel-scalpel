@@ -41,6 +41,8 @@ class StructuralAnomalyScanner extends BaseScanner
         /** @var string[] $configAllowedDirectories */
         $configAllowedDirectories = config('scalpel.structural_allowed_directories', []);
 
+        $phpExtensions = $this->getSuspiciousPhpExtensions();
+
         // Merge user-configured allowed directories with built-in framework exclusions
         $allowedDirectories = array_unique(array_merge($configAllowedDirectories, self::FRAMEWORK_ALLOWED_DIRECTORIES));
 
@@ -54,11 +56,21 @@ class StructuralAnomalyScanner extends BaseScanner
             }
 
             $finder = new Finder;
+
+            // Match plain PHP files (*.php) as well as double-extension
+            // smuggles (*.php.jpg)
+            $nameGlobs = [];
+
+            foreach ($phpExtensions as $extension) {
+                $nameGlobs[] = '*.'.$extension;
+                $nameGlobs[] = '*.'.$extension.'.*';
+            }
+
             $finder->in($zonePath)
                 ->files()
                 ->ignoreDotFiles(false)
                 ->ignoreVCS(true)
-                ->name('*.php');
+                ->name($nameGlobs);
 
             foreach ($finder as $file) {
                 $realPath = $file->getRealPath();
@@ -82,12 +94,28 @@ class StructuralAnomalyScanner extends BaseScanner
                     continue;
                 }
 
+                $filename = basename($relativePath);
+                $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+
+                // Double-extension webshell (e.g. shell.php.jpg)
+                if (! in_array($extension, $phpExtensions, true)) {
+                    $findings->add(Finding::make(
+                        severity: Severity::HIGH,
+                        file: $relativePath,
+                        line: null,
+                        description: "File '{$filename}' embeds a PHP extension under a different final extension — a common upload-filter bypass for web shells.",
+                        scannerName: $this->name(),
+                    ));
+
+                    continue;
+                }
+
                 $findings->add(Finding::make(
                     severity: Severity::HIGH,
                     file: $relativePath,
                     line: null,
-                    description: "PHP file found in non-PHP zone '{$zone}'. This may indicate a web shell or backdoor.",
-                    scanner_name: $this->name(),
+                    description: "PHP file ('.{$extension}') found in non-PHP zone '{$zone}'. This may indicate a web shell or backdoor.",
+                    scannerName: $this->name(),
                 ));
             }
         }

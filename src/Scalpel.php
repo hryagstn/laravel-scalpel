@@ -15,6 +15,23 @@ use Hryagstn\Scalpel\Scanners\StructuralAnomalyScanner;
 
 final class Scalpel
 {
+    /**
+     * CLI aliases mapped to their scanner class.
+     *
+     * This is the single source of truth for scanner aliases. Scanner names
+     * are resolved at runtime from the scanner instance's name() method, so
+     * this map can never drift out of sync with the scanners themselves.
+     *
+     * @var array<string, class-string<ScannerInterface>>
+     */
+    public const SCANNER_ALIASES = [
+        'structural' => StructuralAnomalyScanner::class,
+        'obfuscated' => ObfuscatedCodeScanner::class,
+        'htaccess' => HtaccessScanner::class,
+        'baseline' => BaselineDiffScanner::class,
+        'env' => EnvIntegrityScanner::class,
+    ];
+
     /** @var ScannerInterface[] */
     private array $scanners;
 
@@ -116,8 +133,8 @@ final class Scalpel
             $content = file_get_contents($composerPath);
             if ($content !== false) {
                 $data = json_decode($content, true);
-                if (is_array($data) && isset($data['version'])) {
-                    return (string) $data['version'];
+                if (is_array($data) && isset($data['version']) && is_string($data['version'])) {
+                    return $data['version'];
                 }
             }
         }

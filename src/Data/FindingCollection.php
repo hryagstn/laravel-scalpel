@@ -93,7 +93,7 @@ final class FindingCollection implements Countable, IteratorAggregate
         $groups = [];
 
         foreach ($this->findings as $finding) {
-            $groups[$finding->scanner_name][] = $finding;
+            $groups[$finding->scannerName][] = $finding;
         }
 
         return $groups;
@@ -150,11 +150,11 @@ final class FindingCollection implements Countable, IteratorAggregate
     /**
      * Convert the collection to an array of associative arrays.
      *
-     * @return array<int, array<string, mixed>>
+     * @return list<array<string, mixed>>
      */
     public function toArray(): array
     {
-        return array_map(fn (Finding $f) => $f->toArray(), $this->findings);
+        return array_values(array_map(fn (Finding $f) => $f->toArray(), $this->findings));
     }
 
     /**

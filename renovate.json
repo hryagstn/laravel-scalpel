@@ -1,0 +1,33 @@
+{
+    "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+    "extends": [
+        "config:recommended",
+        ":semanticCommits",
+        ":separateMajorReleases"
+    ],
+    "schedule": [
+        "weekly"
+    ],
+    "rangeStrategy": "bump",
+    "packageRules": [
+        {
+            "description": "Group dev dependency updates into a single PR",
+            "matchDepTypes": [
+                "devDependencies"
+            ],
+            "groupName": "dev dependencies",
+            "automerge": false
+        },
+        {
+            "description": "Delay major version bumps of Laravel components",
+            "matchPackagePrefixes": [
+                "illuminate/",
+                "orchestra/"
+            ],
+            "matchUpdateTypes": [
+                "major"
+            ],
+            "dependencyDashboardApproval": true
+        }
+    ]
+}

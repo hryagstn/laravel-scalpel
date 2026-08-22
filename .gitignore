@@ -9,3 +9,6 @@ composer.lock
 Thumbs.db
 *.swp
 *.swo
+
+# graphify knowledge graph output
+graphify-out/

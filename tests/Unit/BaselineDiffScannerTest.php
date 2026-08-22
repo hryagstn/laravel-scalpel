@@ -228,4 +228,119 @@ class BaselineDiffScannerTest extends TestCase
         $baselineContents = json_decode(Storage::get('scalpel/baseline.json'), true);
         $this->assertEquals($baselineContents['files']['app/User.php']['hash'], hash_file('sha256', $file)); // Now it matches disk hash!
     }
+
+    public function test_baseline_contains_schema_version(): void
+    {
+        $scanner = new BaselineDiffScanner;
+
+        @mkdir($this->tempDir.'/app', 0777, true);
+        file_put_contents($this->tempDir.'/app/User.php', '<?php class User {}');
+
+        $scanner->createBaseline($this->tempDir);
+
+        $baselineContents = json_decode((string) Storage::get('scalpel/baseline.json'), true);
+
+        $this->assertArrayHasKey('schema_version', $baselineContents);
+        $this->assertSame(1, $baselineContents['schema_version']);
+    }
+
+    public function test_signed_baseline_passes_verification(): void
+    {
+        config([
+            'scalpel.signing.enabled' => true,
+            'scalpel.signing.key' => 'test-signing-secret-key',
+        ]);
+
+        $scanner = new BaselineDiffScanner;
+
+        file_put_contents($this->tempDir.'/.env', 'APP_ENV=local');
+        $stats = $scanner->createBaseline($this->tempDir);
+
+        $this->assertTrue($stats['signed']);
+
+        $findings = $scanner->scan($this->tempDir);
+        $this->assertCount(0, $findings);
+    }
+
+    public function test_tampered_baseline_is_detected_when_signing_enabled(): void
+    {
+        config([
+            'scalpel.signing.enabled' => true,
+            'scalpel.signing.key' => 'test-signing-secret-key',
+        ]);
+
+        $scanner = new BaselineDiffScanner;
+
+        file_put_contents($this->tempDir.'/.env', 'APP_ENV=local');
+        $scanner->createBaseline($this->tempDir);
+
+        // Simulate an attacker regenerating the baseline (with a bogus
+        // signature) to conceal a backdoor
+        $tampered = json_encode([
+            'schema_version' => 1,
+            'created_at' => date('c'),
+            'base_path' => $this->tempDir,
+            'files' => [],
+            'signature' => str_repeat('a', 64),
+        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        Storage::put('scalpel/baseline.json', (string) $tampered);
+
+        $findings = $scanner->scan($this->tempDir);
+
+        $this->assertCount(1, $findings);
+        $finding = $findings->all()[0];
+        $this->assertEquals('CRITICAL', $finding->severity->value);
+        $this->assertStringContainsString('signature verification FAILED', $finding->description);
+    }
+
+    public function test_unsigned_baseline_is_flagged_when_signing_enabled(): void
+    {
+        config([
+            'scalpel.signing.enabled' => true,
+            'scalpel.signing.key' => 'test-signing-secret-key',
+        ]);
+
+        $scanner = new BaselineDiffScanner;
+
+        file_put_contents($this->tempDir.'/.env', 'APP_ENV=local');
+
+        // Create the baseline with signing disabled first...
+        config(['scalpel.signing.enabled' => false]);
+        $scanner->createBaseline($this->tempDir);
+
+        // ...then enable signing and diff — the unsigned baseline must not be trusted
+        config(['scalpel.signing.enabled' => true]);
+
+        $findings = $scanner->scan($this->tempDir);
+
+        $this->assertCount(1, $findings);
+        $finding = $findings->all()[0];
+        $this->assertEquals('CRITICAL', $finding->severity->value);
+        $this->assertStringContainsString('not signed', $finding->description);
+    }
+
+    public function test_signature_verification_is_skipped_when_signing_disabled(): void
+    {
+        config([
+            'scalpel.signing.enabled' => false,
+            'scalpel.signing.key' => null,
+        ]);
+
+        $scanner = new BaselineDiffScanner;
+
+        file_put_contents($this->tempDir.'/.env', 'APP_ENV=local');
+
+        // Create a signed baseline, then disable signing — diff must still work
+        config([
+            'scalpel.signing.enabled' => true,
+            'scalpel.signing.key' => 'test-signing-secret-key',
+        ]);
+        $stats = $scanner->createBaseline($this->tempDir);
+        $this->assertTrue($stats['signed']);
+
+        config(['scalpel.signing.enabled' => false]);
+
+        $findings = $scanner->scan($this->tempDir);
+        $this->assertCount(0, $findings);
+    }
 }

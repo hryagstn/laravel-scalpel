@@ -22,6 +22,8 @@ class HtaccessScanner extends BaseScanner
         'disable_functions',
         'display_errors',
         'enable_dl',
+        'auto_prepend_file',
+        'auto_append_file',
     ];
 
     /**
@@ -57,30 +59,35 @@ class HtaccessScanner extends BaseScanner
         $findings = new FindingCollection;
         $excludedPaths = $this->getExcludedPaths();
 
-        // Use a dedicated Finder for .htaccess files.
+        // Use dedicated iterators for server config files.
         // We do NOT use createFinder() from BaseScanner because Symfony Finder's
         // ignoreDotFiles() affects file detection inconsistently across versions.
-        // Instead we manually glob for .htaccess files to ensure reliable detection.
-        $htaccessFiles = $this->findHtaccessFiles($basePath, $excludedPaths);
-
-        foreach ($htaccessFiles as $fullPath) {
+        // Instead we manually glob for config files to ensure reliable detection.
+        foreach ($this->findConfigFiles($basePath, $excludedPaths, '.htaccess') as $fullPath) {
             $relativePath = $this->relativePath($fullPath, $basePath);
             $this->scanHtaccessFile($fullPath, $relativePath, $findings);
+        }
+
+        foreach ($this->findConfigFiles($basePath, $excludedPaths, '.user.ini') as $fullPath) {
+            $relativePath = $this->relativePath($fullPath, $basePath);
+            $this->scanUserIniFile($fullPath, $relativePath, $findings);
         }
 
         return $findings;
     }
 
     /**
-     * Find all .htaccess files recursively under $basePath, respecting exclusions.
+     * Find all files with the given name recursively under $basePath,
+     * respecting exclusions.
      *
      * Uses RecursiveDirectoryIterator directly to avoid dot-file issues with
      * Symfony Finder across different configurations.
      *
      * @param  string[]  $excludedPaths
+     * @param  string  $filename  e.g. '.htaccess' or '.user.ini'
      * @return string[]
      */
-    private function findHtaccessFiles(string $basePath, array $excludedPaths): array
+    private function findConfigFiles(string $basePath, array $excludedPaths, string $filename): array
     {
         $results = [];
         $basePath = rtrim($basePath, '/');
@@ -95,11 +102,15 @@ class HtaccessScanner extends BaseScanner
             );
 
             foreach ($iterator as $file) {
+                if (! $file instanceof \SplFileInfo) {
+                    continue;
+                }
+
                 if (! $file->isFile()) {
                     continue;
                 }
 
-                if ($file->getFilename() !== '.htaccess') {
+                if ($file->getFilename() !== $filename) {
                     continue;
                 }
 
@@ -190,7 +201,7 @@ class HtaccessScanner extends BaseScanner
                     file: $relativePath,
                     line: $lineNumber,
                     description: "Dangerous AddHandler/SetHandler directive '{$handler}' — could allow execution of uploaded scripts.",
-                    scanner_name: $this->name(),
+                    scannerName: $this->name(),
                 ));
 
                 return;
@@ -206,7 +217,7 @@ class HtaccessScanner extends BaseScanner
                     file: $relativePath,
                     line: $lineNumber,
                     description: "AddHandler/SetHandler uses script handler '{$handler}' — could allow execution of non-standard file types as scripts.",
-                    scanner_name: $this->name(),
+                    scannerName: $this->name(),
                 ));
 
                 return;
@@ -220,7 +231,7 @@ class HtaccessScanner extends BaseScanner
                 file: $relativePath,
                 line: $lineNumber,
                 description: "AddHandler/SetHandler uses suspicious MIME-type handler '{$handler}' — may enable script execution.",
-                scanner_name: $this->name(),
+                scannerName: $this->name(),
             ));
         }
     }
@@ -249,7 +260,7 @@ class HtaccessScanner extends BaseScanner
                     file: $relativePath,
                     line: $lineNumber,
                     description: "AddType maps '{$extensions}' to script handler '{$mimeType}' — may enable code execution via non-standard file extensions.",
-                    scanner_name: $this->name(),
+                    scannerName: $this->name(),
                 ));
 
                 return;
@@ -263,7 +274,7 @@ class HtaccessScanner extends BaseScanner
                 file: $relativePath,
                 line: $lineNumber,
                 description: "AddType maps '{$extensions}' to suspicious MIME type '{$mimeType}' — may enable script execution.",
-                scanner_name: $this->name(),
+                scannerName: $this->name(),
             ));
         }
     }
@@ -290,11 +301,9 @@ class HtaccessScanner extends BaseScanner
             }
 
             $isDangerous = match ($directive) {
-                'allow_url_include',
-                'allow_url_fopen',
-                'display_errors',
-                'enable_dl' => in_array($value, ['on', '1', 'true', 'yes'], true),
                 'disable_functions' => $value === '' || $value === 'none',
+                'auto_prepend_file', 'auto_append_file' => true,
+                default => in_array($value, ['on', '1', 'true', 'yes'], true),
             };
 
             if ($isDangerous) {
@@ -302,8 +311,8 @@ class HtaccessScanner extends BaseScanner
                     severity: Severity::CRITICAL,
                     file: $relativePath,
                     line: $lineNumber,
-                    description: "php_{$matches[1]} disables security setting: '{$directive}' set to '{$value}'.",
-                    scanner_name: $this->name(),
+                    description: "php_{$matches[1]} sets security-sensitive directive: '{$directive}' set to '{$value}'.",
+                    scannerName: $this->name(),
                 ));
             }
         }
@@ -327,7 +336,7 @@ class HtaccessScanner extends BaseScanner
             file: $relativePath,
             line: $lineNumber,
             description: 'RewriteRule redirects to an external URL — may be used for phishing or traffic hijacking.',
-            scanner_name: $this->name(),
+            scannerName: $this->name(),
         ));
     }
 
@@ -349,7 +358,66 @@ class HtaccessScanner extends BaseScanner
             file: $relativePath,
             line: $lineNumber,
             description: 'Options ExecCGI enabled — allows execution of CGI scripts in this directory.',
-            scanner_name: $this->name(),
+            scannerName: $this->name(),
         ));
+    }
+
+    /**
+     * Scan a single .user.ini file line by line.
+     *
+     * `.user.ini` is the PHP-FPM equivalent of .htaccess php_* directives and
+     * a classic persistence vector: `auto_prepend_file = shell.txt` causes
+     * the attacker's file to be executed with every PHP request.
+     */
+    private function scanUserIniFile(
+        string $filePath,
+        string $relativePath,
+        FindingCollection $findings,
+    ): void {
+        $handle = @fopen($filePath, 'r');
+
+        if ($handle === false) {
+            return;
+        }
+
+        $lineNumber = 0;
+
+        try {
+            while (($line = fgets($handle)) !== false) {
+                $lineNumber++;
+
+                // Normalize line endings, trim, and skip comments/empty lines
+                $trimmedLine = trim(str_replace(["\r\n", "\r"], "\n", $line));
+
+                if ($trimmedLine === '' || str_starts_with($trimmedLine, ';') || str_starts_with($trimmedLine, '#')) {
+                    continue;
+                }
+
+                if (preg_match('/^([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(.*)$/i', $trimmedLine, $matches) !== 1) {
+                    continue;
+                }
+
+                $directive = strtolower(trim($matches[1]));
+                $value = strtolower(trim($matches[2], " \t\"'"));
+
+                $isDangerous = match ($directive) {
+                    'auto_prepend_file', 'auto_append_file' => $value !== '',
+                    'disable_functions' => $value === '' || $value === 'none',
+                    default => false,
+                };
+
+                if ($isDangerous) {
+                    $findings->add(Finding::make(
+                        severity: Severity::CRITICAL,
+                        file: $relativePath,
+                        line: $lineNumber,
+                        description: "Dangerous .user.ini directive: '{$directive}' set to '{$value}' — commonly abused for backdoor persistence on PHP-FPM.",
+                        scannerName: $this->name(),
+                    ));
+                }
+            }
+        } finally {
+            fclose($handle);
+        }
     }
 }

@@ -17,14 +17,14 @@ class FindingTest extends TestCase
             file: 'app/Http/Controllers/BadController.php',
             line: 42,
             description: 'Backdoor found',
-            scanner_name: 'Test Scanner'
+            scannerName: 'Test Scanner'
         );
 
         $this->assertEquals(Severity::CRITICAL, $finding->severity);
         $this->assertEquals('app/Http/Controllers/BadController.php', $finding->file);
         $this->assertEquals(42, $finding->line);
         $this->assertEquals('Backdoor found', $finding->description);
-        $this->assertEquals('Test Scanner', $finding->scanner_name);
+        $this->assertEquals('Test Scanner', $finding->scannerName);
 
         $expectedArray = [
             'severity' => 'CRITICAL',

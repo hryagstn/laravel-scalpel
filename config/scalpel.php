@@ -103,6 +103,31 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Suspicious PHP Extensions
+    |--------------------------------------------------------------------------
+    |
+    | File extensions treated as executable PHP by the StructuralAnomalyScanner.
+    | Attackers use lesser-known extensions (.phtml, .pht, .phar, .php5)
+    | because servers are sometimes configured to execute them while
+    | scanners only look for .php. Double-extension files (shell.php.jpg)
+    | are also detected based on this list.
+    |
+    */
+
+    'suspicious_php_extensions' => [
+        'php',
+        'pht',
+        'phtm',
+        'phtml',
+        'phar',
+        'php3',
+        'php4',
+        'php5',
+        'php7',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Obfuscation Patterns
     |--------------------------------------------------------------------------
     |
@@ -118,6 +143,10 @@ return [
         'eval_gzuncompress' => true,
         'eval_gzdecode' => true,
         'assert_dynamic' => true,
+        'eval_direct_input' => true,
+        'backtick_operator' => true,
+        'variable_variables' => true,
+        'extract_input' => true,
         'variable_functions' => true,
         'preg_replace_e' => true,
         'long_encoded_string' => true,
@@ -239,6 +268,19 @@ return [
     */
 
     'severity_threshold' => 'LOW',
+
+    /*
+    |--------------------------------------------------------------------------
+    | Suppress Banner
+    |--------------------------------------------------------------------------
+    |
+    | When enabled, the Laravel Scalpel banner is hidden from command output.
+    | Useful for cron jobs and CI pipelines where clean logs are preferred.
+    | The banner is always suppressed automatically for --format=json.
+    |
+    */
+
+    'suppress_banner' => env('SCALPEL_SUPPRESS_BANNER', false),
 
     /*
     |--------------------------------------------------------------------------
