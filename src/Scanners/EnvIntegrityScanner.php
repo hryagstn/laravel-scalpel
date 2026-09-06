@@ -288,6 +288,9 @@ class EnvIntegrityScanner extends BaseScanner
 
             if (preg_match('/^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/', $line, $matches) === 1) {
                 $value = trim($matches[2]);
+                if (preg_match('/^([^\"\']*?)\s+#/', $value, $comment) === 1) {
+                    $value = trim($comment[1]);
+                }
                 $value = trim($value, '"\'');
                 $map[$matches[1]] = $value;
             }

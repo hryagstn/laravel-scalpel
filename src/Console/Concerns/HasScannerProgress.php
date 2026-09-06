@@ -15,11 +15,11 @@ trait HasScannerProgress
      */
     protected function runScannerWithProgress(ScannerInterface $scanner, string $basePath, string $format): FindingCollection
     {
-        if ($format !== 'json') {
+        if (! in_array($format, ['json', 'sarif'], true)) {
             $this->info("  ▸ Running scanner: {$scanner->name()}");
         }
 
-        $hasProgress = $format !== 'json' && $scanner instanceof BaseScanner;
+        $hasProgress = ! in_array($format, ['json', 'sarif'], true) && $scanner instanceof BaseScanner;
         if ($hasProgress) {
             $progressBar = null;
             $scanner->setProgressCallback(function (string $event, array $data) use (&$progressBar) {

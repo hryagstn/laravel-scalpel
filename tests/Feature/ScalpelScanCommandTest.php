@@ -174,7 +174,7 @@ class ScalpelScanCommandTest extends TestCase
 
         $this->artisan('scalpel:scan --only=nonexistent')
             ->expectsOutputToContain('Unknown scanner alias: nonexistent')
-            ->assertExitCode(0);
+            ->assertExitCode(2);
     }
 
     public function test_scan_command_returns_exit_code_2_for_medium_or_low_findings_only(): void

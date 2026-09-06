@@ -6,6 +6,7 @@ namespace Hryagstn\Scalpel\Console\Concerns;
 
 use Hryagstn\Scalpel\Data\FindingCollection;
 use Hryagstn\Scalpel\Data\Severity;
+use Hryagstn\Scalpel\Scalpel;
 
 trait OutputsFindings
 {
@@ -31,11 +32,13 @@ trait OutputsFindings
     protected function outputJson(FindingCollection $findings): void
     {
         $payload = [
+            'schema_version' => 1,
+            'generated_at' => date('c'),
             'total' => $findings->count(),
             'findings' => $findings->toArray(),
         ];
 
-        $json = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        $json = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
 
         if ((bool) config('scalpel.signing.enabled', false)) {
             /** @var string|null $key */
@@ -45,10 +48,41 @@ trait OutputsFindings
             }
             $signature = hash_hmac('sha256', (string) $json, $key);
             $payload['signature'] = $signature;
-            $json = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+            $json = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
         }
 
         $this->line((string) $json);
+    }
+
+    /** Output findings in SARIF 2.1.0 for code-scanning integrations. */
+    protected function outputSarif(FindingCollection $findings): void
+    {
+        $results = [];
+        foreach ($findings as $finding) {
+            $results[] = [
+                'ruleId' => strtolower(str_replace(' ', '-', $finding->scannerName)),
+                'level' => match ($finding->severity) {
+                    Severity::CRITICAL, Severity::HIGH => 'error',
+                    Severity::MEDIUM => 'warning',
+                    Severity::LOW => 'note',
+                },
+                'message' => ['text' => $finding->description],
+                'locations' => [[
+                    'physicalLocation' => [
+                        'artifactLocation' => ['uri' => $finding->file],
+                        'region' => array_filter(['startLine' => $finding->line], static fn ($value) => $value !== null),
+                    ],
+                ]],
+            ];
+        }
+        $this->line((string) json_encode([
+            '$schema' => 'https://json.schemastore.org/sarif-2.1.0.json',
+            'version' => '2.1.0',
+            'runs' => [[
+                'tool' => ['driver' => ['name' => 'Laravel Scalpel', 'version' => Scalpel::version()]],
+                'results' => $results,
+            ]],
+        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
     }
 
     /**

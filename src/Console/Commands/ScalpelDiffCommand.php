@@ -8,6 +8,9 @@ use Hryagstn\Scalpel\Console\Commands\Concerns\InteractsWithFindings;
 use Hryagstn\Scalpel\Console\Concerns\HasBanner;
 use Hryagstn\Scalpel\Console\Concerns\HasScannerProgress;
 use Hryagstn\Scalpel\Console\Concerns\OutputsFindings;
+use Hryagstn\Scalpel\Data\Finding;
+use Hryagstn\Scalpel\Data\FindingCollection;
+use Hryagstn\Scalpel\Data\Severity;
 use Hryagstn\Scalpel\Events\ScanFinished;
 use Hryagstn\Scalpel\Scalpel;
 use Hryagstn\Scalpel\Scanners\BaselineDiffScanner;
@@ -26,7 +29,7 @@ final class ScalpelDiffCommand extends Command
      * @var string
      */
     protected $signature = 'scalpel:diff
-        {--format=table : Output format (table, json or github)}
+        {--format=table : Output format (table, json, github or sarif)}
         {--fast : Enable metadata-based fast scan (deferred hashing)}
         {--fail-on= : Minimum severity that constitutes failure: CRITICAL, HIGH, MEDIUM or LOW (default: HIGH)}
         {--no-banner : Suppress the banner/header}';
@@ -46,6 +49,7 @@ final class ScalpelDiffCommand extends Command
         $this->resetFindingsState();
         $startedAt = microtime(true);
 
+        $originalFast = config('scalpel.baseline_fast_scan');
         if ($this->option('fast')) {
             config(['scalpel.baseline_fast_scan' => true]);
         }
@@ -74,13 +78,35 @@ final class ScalpelDiffCommand extends Command
             $this->info('  Run "php artisan scalpel:baseline" first to create a snapshot.');
             $this->newLine();
 
-            return 2;
+            $findings = new FindingCollection([Finding::make(
+                severity: Severity::MEDIUM,
+                file: $scanner->getBaselinePath(),
+                line: null,
+                description: 'No baseline snapshot found. Run `php artisan scalpel:baseline` to create one.',
+                scannerName: $scanner->name(),
+            )]);
+            $findings = $this->applySeverityThreshold($findings);
+            event(new ScanFinished($findings, 'diff', (microtime(true) - $startedAt) * 1000));
+            $formatOption = $this->option('format');
+            $format = is_string($formatOption) ? $formatOption : 'table';
+            if ($format === 'json') {
+                $this->outputJson($findings);
+            } elseif ($format === 'sarif') {
+                $this->outputSarif($findings);
+            } elseif ($format === 'github') {
+                $this->outputGithubAnnotations($findings);
+            } else {
+                $this->outputTable($findings);
+            }
+            config(['scalpel.baseline_fast_scan' => $originalFast]);
+
+            return $this->resolveExitCode($findings);
         }
 
         $formatOption = $this->option('format');
         $format = is_string($formatOption) ? $formatOption : 'table';
 
-        if ($format !== 'json' && $format !== 'github') {
+        if (! in_array($format, ['json', 'sarif', 'github'], true)) {
             $this->info('  ▸ Comparing filesystem against baseline...');
             $this->newLine();
         }
@@ -96,12 +122,17 @@ final class ScalpelDiffCommand extends Command
 
         if ($format === 'json') {
             $this->outputJson($findings);
+        } elseif ($format === 'sarif') {
+            $this->outputSarif($findings);
         } elseif ($format === 'github') {
             $this->outputGithubAnnotations($findings);
         } else {
             $this->outputTable($findings, '✅ No changes detected. Filesystem matches the baseline.');
         }
 
-        return $this->resolveExitCode($findings);
+        $exitCode = $this->resolveExitCode($findings);
+        config(['scalpel.baseline_fast_scan' => $originalFast]);
+
+        return $exitCode;
     }
 }

@@ -5,6 +5,26 @@ All notable changes to `laravel-scalpel` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-09-06
+
+### Security
+- Reworked obfuscation detection with PHP tokenization so inline comments and multiline payloads cannot bypass content rules.
+- Applied case-insensitive suspicious-extension matching consistently to content and structural scanners.
+- Made invalid scanner aliases fail with a nonzero exit code instead of silently running no scanners.
+- Escaped filenames in GitHub Actions annotations and made JSON serialization fail closed on invalid UTF-8.
+- Made baseline signing fail closed when enabled without a key; validate baseline schema, project root, and prior signatures before reuse.
+- Track symlink paths by their filesystem path, report unreadable scan paths as operational errors, and use atomic baseline writes.
+
+### Added
+- Added configurable `baseline_disk` for baseline snapshots.
+- Added `schema_version` and `generated_at` metadata to JSON reports.
+- Added SARIF 2.1.0 output with `--format=sarif` for GitHub code scanning and other SARIF consumers.
+
+### Fixed
+- Corrected `.env` inline-comment parsing and `.htaccess` handling for `-ExecCGI` and quoted directive values.
+- Prevented command-local options such as `--fast`, `--production`, and `--include-vendor` from leaking into later Artisan calls in the same process.
+- Routed missing-baseline diff results through normal formatting, events, and severity/exit-code handling.
+
 ## [1.7.0] - 2026-08-22
 
 ### Added

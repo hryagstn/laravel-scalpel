@@ -100,7 +100,7 @@ trait InteractsWithFindings
             $this->line(sprintf(
                 '::%s file=%s,line=%d,title=%s::%s',
                 $type,
-                $finding->file,
+                $this->escapeGithubAnnotationValue($finding->file),
                 $finding->line ?? 1,
                 $this->escapeGithubAnnotationValue($title),
                 $this->escapeGithubAnnotationValue($finding->description),

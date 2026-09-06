@@ -109,6 +109,7 @@ class ScalpelBaselineCommandTest extends TestCase
             ->expectsOutputToContain('Baseline created successfully')
             ->assertExitCode(0);
 
-        $this->assertTrue(config('scalpel.baseline_fast_scan'));
+        // Command-local options must not leak into subsequent Artisan calls.
+        $this->assertFalse(config('scalpel.baseline_fast_scan'));
     }
 }

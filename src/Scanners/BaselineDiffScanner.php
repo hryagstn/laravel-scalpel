@@ -7,6 +7,7 @@ namespace Hryagstn\Scalpel\Scanners;
 use Hryagstn\Scalpel\Data\Finding;
 use Hryagstn\Scalpel\Data\FindingCollection;
 use Hryagstn\Scalpel\Data\Severity;
+use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\Finder\Finder;
 
@@ -48,6 +49,13 @@ class BaselineDiffScanner extends BaseScanner
 
         // Load existing baseline to reuse unchanged file hashes (Deferred Hashing)
         $oldBaseline = $this->baselineExists() ? $this->loadBaseline() : null;
+        if ($this->baselineExists() && $oldBaseline === null && config('scalpel.signing.enabled', false)) {
+            throw new \RuntimeException('Existing baseline is invalid; refusing to overwrite it without explicit removal.');
+        }
+        if ($oldBaseline !== null && config('scalpel.signing.enabled', false)
+            && $this->validateBaselineSignature($oldBaseline) !== null) {
+            throw new \RuntimeException('Existing baseline signature is invalid; refusing to reuse it.');
+        }
         $oldFiles = is_array($oldBaseline) ? ($oldBaseline['files'] ?? []) : [];
 
         $snapshot = [];
@@ -60,7 +68,7 @@ class BaselineDiffScanner extends BaseScanner
                 continue;
             }
 
-            $relativePath = $this->relativePath($realPath, $basePath);
+            $relativePath = $this->relativePath($file->getPathname(), $basePath);
 
             if ($this->isExcluded($relativePath, $excludedPaths)) {
                 continue;
@@ -73,10 +81,11 @@ class BaselineDiffScanner extends BaseScanner
             if ($fileSize === false || $modifiedAt === false) {
                 continue;
             }
+            $totalSize += $fileSize;
 
             $hash = null;
 
-            if (is_array($oldFiles) && $oldFiles !== [] && isset($oldFiles[$relativePath]) && config('scalpel.baseline_fast_scan', true)) {
+            if (is_array($oldFiles) && $oldFiles !== [] && isset($oldFiles[$relativePath]) && config('scalpel.baseline_fast_scan', false)) {
                 $oldFile = $oldFiles[$relativePath];
 
                 $oldSize = is_array($oldFile) ? ($oldFile['size'] ?? null) : null;
@@ -129,6 +138,9 @@ class BaselineDiffScanner extends BaseScanner
         // HMAC-sign the baseline so tampering (e.g. an attacker regenerating
         // it to conceal a planted backdoor) can be detected by scalpel:diff.
         $signingKey = $this->signingKey();
+        if (config('scalpel.signing.enabled', false) && $signingKey === null) {
+            throw new \RuntimeException('Scalpel signing is enabled but SCALPEL_SIGNING_KEY is missing.');
+        }
 
         if ($signingKey !== null) {
             $baselineData['signature'] = hash_hmac('sha256', $baselineJson, $signingKey);
@@ -139,7 +151,13 @@ class BaselineDiffScanner extends BaseScanner
             }
         }
 
-        Storage::put($this->getBaselinePath(), $baselineJson);
+        $storage = $this->baselineStorage();
+        $path = $this->getBaselinePath();
+        $temporaryPath = $path.'.tmp.'.bin2hex(random_bytes(8));
+        if ($storage->put($temporaryPath, $baselineJson) === false || ! $storage->move($temporaryPath, $path)) {
+            $storage->delete($temporaryPath);
+            throw new \RuntimeException('Unable to write baseline snapshot.');
+        }
 
         return [
             'files' => count($snapshot),
@@ -154,7 +172,7 @@ class BaselineDiffScanner extends BaseScanner
      */
     public function baselineExists(): bool
     {
-        return Storage::exists($this->getBaselinePath());
+        return $this->baselineStorage()->exists($this->getBaselinePath());
     }
 
     /**
@@ -208,6 +226,21 @@ class BaselineDiffScanner extends BaseScanner
                 file: $this->getBaselinePath(),
                 line: null,
                 description: $signatureError,
+                scannerName: $this->name(),
+            ));
+
+            return $findings;
+        }
+
+        if (isset($baseline['base_path']) && is_string($baseline['base_path'])
+            && realpath($baseline['base_path']) !== false
+            && realpath($basePath) !== false
+            && realpath($baseline['base_path']) !== realpath($basePath)) {
+            $findings->add(Finding::make(
+                severity: Severity::HIGH,
+                file: $this->getBaselinePath(),
+                line: null,
+                description: 'Baseline belongs to a different project root and cannot be trusted for this scan.',
                 scannerName: $this->name(),
             ));
 
@@ -331,7 +364,7 @@ class BaselineDiffScanner extends BaseScanner
      */
     private function loadBaseline(): ?array
     {
-        $contents = Storage::get($this->getBaselinePath());
+        $contents = $this->baselineStorage()->get($this->getBaselinePath());
 
         if ($contents === null) {
             return null;
@@ -344,7 +377,30 @@ class BaselineDiffScanner extends BaseScanner
             return null;
         }
 
+        if (($data['schema_version'] ?? null) !== self::BASELINE_SCHEMA_VERSION
+            || ! is_array($data['files'] ?? null)
+            || ! is_string($data['created_at'] ?? null)) {
+            return null;
+        }
+
+        foreach ($data['files'] as $path => $entry) {
+            if (! is_string($path) || ! is_array($entry)
+                || ! is_string($entry['hash'] ?? null)
+                || ! is_int($entry['size'] ?? null)
+                || ! is_int($entry['modified_at'] ?? null)) {
+                return null;
+            }
+        }
+
         return $data;
+    }
+
+    private function baselineStorage(): Filesystem
+    {
+        /** @var string $disk */
+        $disk = config('scalpel.baseline_disk', 'local');
+
+        return Storage::disk($disk);
     }
 
     /**
@@ -377,6 +433,10 @@ class BaselineDiffScanner extends BaseScanner
     private function validateBaselineSignature(array $baseline): ?string
     {
         $signingKey = $this->signingKey();
+
+        if (config('scalpel.signing.enabled', false) && $signingKey === null) {
+            return 'Baseline signing is enabled but SCALPEL_SIGNING_KEY is missing.';
+        }
 
         if ($signingKey === null) {
             return null;
@@ -429,7 +489,7 @@ class BaselineDiffScanner extends BaseScanner
                 continue;
             }
 
-            $relativePath = $this->relativePath($realPath, $basePath);
+            $relativePath = $this->relativePath($file->getPathname(), $basePath);
 
             if ($this->isExcluded($relativePath, $excludedPaths)) {
                 continue;
@@ -445,7 +505,7 @@ class BaselineDiffScanner extends BaseScanner
 
             $hash = null;
 
-            if ($baselineFiles !== null && isset($baselineFiles[$relativePath]) && config('scalpel.baseline_fast_scan', true)) {
+            if ($baselineFiles !== null && isset($baselineFiles[$relativePath]) && config('scalpel.baseline_fast_scan', false)) {
                 $baselineFile = $baselineFiles[$relativePath];
 
                 if ($baselineFile['size'] === $fileSize && $baselineFile['modified_at'] === $modifiedAt) {

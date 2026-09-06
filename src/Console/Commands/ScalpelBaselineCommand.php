@@ -32,6 +32,7 @@ final class ScalpelBaselineCommand extends Command
      */
     public function handle(Scalpel $scalpel): int
     {
+        $originalFast = config('scalpel.baseline_fast_scan');
         if ($this->option('fast')) {
             config(['scalpel.baseline_fast_scan' => true]);
         }
@@ -88,19 +89,24 @@ final class ScalpelBaselineCommand extends Command
         });
 
         $basePath = (string) base_path();
-        $baseline = $scanner->createBaseline($basePath);
-
-        $scanner->setProgressCallback(null);
+        try {
+            $baseline = $scanner->createBaseline($basePath);
+        } finally {
+            $scanner->setProgressCallback(null);
+            config(['scalpel.baseline_fast_scan' => $originalFast]);
+        }
 
         $fileCount = $baseline['files'];
 
         /** @var string $baselinePath */
         $baselinePath = config('scalpel.baseline_path', 'scalpel/baseline.json');
+        /** @var string $baselineDisk */
+        $baselineDisk = config('scalpel.baseline_disk', 'local');
 
         $this->newLine();
         $this->info('  ✅ Baseline created successfully!');
         $this->line("  📁 Files indexed: <fg=white;options=bold>{$fileCount}</>");
-        $this->line("  💾 Stored at: <fg=gray>storage/app/private/{$baselinePath}</>");
+        $this->line("  💾 Stored at: <fg=gray>{$baselineDisk}:{$baselinePath}</>");
         $this->newLine();
 
         return 0;

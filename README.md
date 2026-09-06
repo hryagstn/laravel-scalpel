@@ -142,6 +142,9 @@ php artisan scalpel:scan --format=json
 # Output GitHub Actions annotations (renders inline on PRs)
 php artisan scalpel:scan --format=github
 
+# Output SARIF for code-scanning integrations
+php artisan scalpel:scan --format=sarif
+
 # Also scan vendor/ for obfuscated code (slower, recommended after deployments)
 php artisan scalpel:scan --include-vendor
 
@@ -154,7 +157,7 @@ php artisan scalpel:scan --fail-on=MEDIUM
 | Option            | Description                                                                 |
 |-------------------|-----------------------------------------------------------------------------|
 | `--only`          | Comma-separated list of scanners to run: `structural`, `obfuscated`, `htaccess`, `baseline`, `env` |
-| `--format`        | Output format: `table` (default), `json` or `github`                        |
+| `--format`        | Output format: `table` (default), `json`, `github`, or `sarif`              |
 | `--fast`          | Enable metadata-based fast scan (Deferred Hashing) for this execution.      |
 | `--include-vendor`| Include the `vendor/` directory in content scanning (slower).               |
 | `--fail-on`       | Minimum severity that constitutes failure: `CRITICAL`, `HIGH` (default), `MEDIUM` or `LOW`. |
@@ -193,7 +196,7 @@ php artisan scalpel:baseline --force
 
 ### `scalpel:diff`
 
-Compare the current filesystem state against a previously created baseline snapshot. Reports added, removed, and modified files.
+Compare the current filesystem state against a previously created baseline snapshot. Reports added, removed, and modified files. A missing baseline is emitted as a MEDIUM finding and uses the same output/exit-code contract as other findings.
 
 ```bash
 # Compare against baseline
@@ -207,7 +210,7 @@ php artisan scalpel:diff --format=json
 
 | Option     | Description                                    |
 |------------|------------------------------------------------|
-| `--format` | Output format: `table` (default), `json` or `github` |
+| `--format` | Output format: `table` (default), `json`, `github`, or `sarif` |
 | `--fast`   | Enable metadata-based fast scan (Deferred Hashing) for this execution. |
 | `--fail-on`| Minimum severity that constitutes failure: `CRITICAL`, `HIGH` (default), `MEDIUM` or `LOW`. |
 
@@ -448,6 +451,12 @@ Where the baseline snapshot JSON file is stored, relative to `storage/app/privat
 'baseline_path' => 'scalpel/baseline.json',
 ```
 
+The baseline is written through the configured filesystem disk. Keep this disk outside the public web root and restrict write access to the application user.
+
+```php
+'baseline_disk' => env('SCALPEL_BASELINE_DISK', 'local'),
+```
+
 ### `baseline_fast_scan`
 
 When enabled, Scalpel compares a file's size and modified time (mtime) against the baseline before calculating its SHA-256 hash. If they match, hash computation is skipped — drastically improving performance at the cost of protection against sophisticated "timestomping" attacks.
@@ -468,7 +477,7 @@ Minimum severity level to include in results. Findings below this level are sile
 
 ### `suppress_banner`
 
-Hide the Laravel Scalpel banner from command output. Useful for cron jobs and clean CI logs. The banner is always suppressed automatically for `--format=json` and `--format=github`.
+Hide the Laravel Scalpel banner from command output. Useful for cron jobs and clean CI logs. The banner is always suppressed automatically for machine-readable `--format=json`, `--format=github`, and `--format=sarif`.
 
 ```php
 'suppress_banner' => env('SCALPEL_SUPPRESS_BANNER', false),
@@ -508,7 +517,13 @@ jobs:
         run: composer install --no-interaction --prefer-dist
 
       - name: Run Scalpel Scan
-        run: php artisan scalpel:scan --format=json
+        continue-on-error: true
+        run: php artisan scalpel:scan --format=sarif > scalpel.sarif
+
+      - name: Upload SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: scalpel.sarif
 
       - name: Run Baseline Diff
         run: php artisan scalpel:diff --format=json
@@ -670,6 +685,7 @@ fi
 ## 🤝 Contributing
 
 Contributions are welcome! Please read our [contributing guide](CONTRIBUTING.md) to learn how to get started, set up the development environment, and run tests.
+
 
 Please make sure your code follows the existing style and includes appropriate tests.
 

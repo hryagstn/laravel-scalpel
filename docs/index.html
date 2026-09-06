@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Build: v1.7.0 - 2026-08-22 -->
+<!-- Build: v1.8.0 - 2026-09-06 -->
 <html lang="en">
 
 <head>
@@ -72,7 +72,7 @@
             <a href="#" class="logo-wrapper">
                 <img src="logo.png" alt="Laravel Scalpel Logo" class="header-logo" width="32" height="32">
                 <span class="logo-text">Laravel <span class="accent-text">Scalpel</span></span>
-                <span class="badge-version">v1.7.0</span>
+                <span class="badge-version">v1.8.0</span>
             </a>
 
             <nav class="main-nav" aria-label="Main Navigation">
@@ -378,6 +378,7 @@
                     <ul class="scanner-details">
                         <li>Generates <code>baseline.json</code> snapshots</li>
                         <li>HMAC-signed snapshots — tampered baselines are reported as CRITICAL</li>
+                        <li>Atomic writes, schema validation, root checks, and configurable storage disk</li>
                         <li>Excludes dynamic paths (logs, caching views)</li>
                         <li>Supports <code>--fast</code> option for deferred hashing</li>
                     </ul>
@@ -574,6 +575,8 @@
     <span class="comment">// Use metadata-based fast scans; set true via --fast parameter or env override</span>
     <span class="string">'baseline_fast_scan'</span> => <span class="keyword">env</span>(<span class="string">'SCALPEL_BASELINE_FAST_SCAN'</span>, <span class="constant">false</span>),
 
+    <span class="string">'baseline_disk'</span> => <span class="keyword">env</span>(<span class="string">'SCALPEL_BASELINE_DISK'</span>, <span class="string">'local'</span>),
+
     <span class="comment">// Force strict production environment checks</span>
     <span class="string">'assume_production'</span> => <span class="keyword">env</span>(<span class="string">'SCALPEL_ASSUME_PRODUCTION'</span>, <span class="constant">false</span>),
 
@@ -617,7 +620,13 @@
 
       <span class="comment"># Annotations render inline on pull requests (::error / ::warning)</span>
       - <span class="keyword">name</span>: Run Scalpel Scan
-        <span class="keyword">run</span>: php artisan scalpel:scan --format=github
+        <span class="keyword">continue-on-error</span>: <span class="constant">true</span>
+        <span class="keyword">run</span>: php artisan scalpel:scan --format=sarif &gt; scalpel.sarif
+
+      - <span class="keyword">name</span>: Upload SARIF
+        <span class="keyword">uses</span>: github/codeql-action/upload-sarif@v3
+        <span class="keyword">with</span>:
+          <span class="keyword">sarif_file</span>: scalpel.sarif
 
       - <span class="keyword">name</span>: Run Baseline Diff
         <span class="keyword">run</span>: php artisan scalpel:diff --format=json</code></pre>

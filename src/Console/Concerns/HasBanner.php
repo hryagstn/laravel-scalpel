@@ -27,7 +27,7 @@ trait HasBanner
      */
     protected function shouldSuppressBanner(): bool
     {
-        return ($this->hasOption('format') && in_array($this->option('format'), ['json', 'github'], true))
+        return ($this->hasOption('format') && in_array($this->option('format'), ['json', 'sarif', 'github'], true))
             || ($this->hasOption('no-ansi') && $this->option('no-ansi'))
             || ($this->hasOption('no-banner') && $this->option('no-banner'))
             || (bool) config('scalpel.suppress_banner', false);

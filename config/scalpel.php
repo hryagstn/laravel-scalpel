@@ -92,7 +92,7 @@ return [
     |
     | To also scan vendor/ for obfuscated code (slower, recommended after
     | deployments): php artisan scalpel:scan --include-vendor
-    | (available in a future release)
+    | (available via --include-vendor)
     |
     */
 
@@ -223,11 +223,14 @@ return [
     |--------------------------------------------------------------------------
     |
     | The path where baseline snapshots are stored, relative to the
-    | storage/app directory. Uses Laravel's Storage facade with local disk.
+    | storage/app directory. Uses the configured baseline_disk.
     |
     */
 
     'baseline_path' => 'scalpel/baseline.json',
+
+    /* Filesystem disk used for baseline snapshots. Keep this outside the web root. */
+    'baseline_disk' => env('SCALPEL_BASELINE_DISK', 'local'),
 
     /*
     |--------------------------------------------------------------------------
@@ -276,7 +279,8 @@ return [
     |
     | When enabled, the Laravel Scalpel banner is hidden from command output.
     | Useful for cron jobs and CI pipelines where clean logs are preferred.
-    | The banner is always suppressed automatically for --format=json.
+    | The banner is always suppressed automatically for --format=json or
+    | --format=github.
     |
     */
 

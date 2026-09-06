@@ -27,7 +27,7 @@ final class ScalpelScanCommand extends Command
      */
     protected $signature = 'scalpel:scan
         {--only= : Comma-separated list of scanners to run}
-        {--format=table : Output format (table, json or github)}
+        {--format=table : Output format (table, json, github or sarif)}
         {--fast : Enable metadata-based fast scan (deferred hashing)}
         {--include-vendor : Include the vendor/ directory in content scanning (slower)}
         {--fail-on= : Minimum severity that constitutes failure: CRITICAL, HIGH, MEDIUM or LOW (default: HIGH)}
@@ -49,14 +49,17 @@ final class ScalpelScanCommand extends Command
         $this->resetFindingsState();
         $startedAt = microtime(true);
 
+        $originalConfig = [
+            'fast' => config('scalpel.baseline_fast_scan'),
+            'production' => config('scalpel.assume_production'),
+            'content' => config('scalpel.content_scan_excluded_paths', []),
+        ];
         if ($this->option('fast')) {
             config(['scalpel.baseline_fast_scan' => true]);
         }
-
         if ($this->option('production')) {
             config(['scalpel.assume_production' => true]);
         }
-
         if ($this->option('include-vendor')) {
             $this->enableVendorContentScanning();
         }
@@ -79,6 +82,11 @@ final class ScalpelScanCommand extends Command
         // Run scanners
         if ($onlyOption !== null && $onlyOption !== '') {
             $scannerClasses = $this->resolveScannerNames($onlyOption);
+            if ($scannerClasses === null) {
+                $this->restoreConfig($originalConfig);
+
+                return 2;
+            }
             $findings = $this->runSelectedScanners($scalpel, $basePath, $scannerClasses, $format);
         } else {
             $findings = $this->runAllScanners($scalpel, $basePath, $format);
@@ -93,13 +101,18 @@ final class ScalpelScanCommand extends Command
         // Output results
         if ($format === 'json') {
             $this->outputJson($findings);
+        } elseif ($format === 'sarif') {
+            $this->outputSarif($findings);
         } elseif ($format === 'github') {
             $this->outputGithubAnnotations($findings);
         } else {
             $this->outputTable($findings);
         }
 
-        return $this->resolveExitCode($findings);
+        $exitCode = $this->resolveExitCode($findings);
+        $this->restoreConfig($originalConfig);
+
+        return $exitCode;
     }
 
     /**
@@ -126,28 +139,47 @@ final class ScalpelScanCommand extends Command
      *
      * @return array<class-string>
      */
-    private function resolveScannerNames(string $onlyOption): array
+    private function resolveScannerNames(string $onlyOption): ?array
     {
         $aliases = array_map('trim', explode(',', $onlyOption));
         $resolved = [];
 
         foreach ($aliases as $alias) {
+            if ($alias === '') {
+                continue;
+            }
             $alias = strtolower($alias);
 
             $scannerClass = Scalpel::SCANNER_ALIASES[$alias] ?? null;
 
             if ($scannerClass === null) {
-                if (! is_string($this->option('format')) || $this->option('format') !== 'json') {
-                    $this->warn("Unknown scanner alias: {$alias}");
+                $message = "Unknown scanner alias: {$alias}";
+                if ($this->option('format') === 'json') {
+                    $this->line(json_encode([
+                        'schema_version' => 1,
+                        'error' => $message,
+                    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
+                } else {
+                    $this->error($message);
                 }
 
-                continue;
+                return null;
             }
 
             $resolved[] = $scannerClass;
         }
 
         return $resolved;
+    }
+
+    /** @param array{fast:mixed,production:mixed,content:array<int, string>} $configValues */
+    private function restoreConfig(array $configValues): void
+    {
+        config([
+            'scalpel.baseline_fast_scan' => $configValues['fast'],
+            'scalpel.assume_production' => $configValues['production'],
+            'scalpel.content_scan_excluded_paths' => $configValues['content'],
+        ]);
     }
 
     /**
@@ -168,7 +200,7 @@ final class ScalpelScanCommand extends Command
             $collection->merge($this->runScannerWithProgress($scanner, $basePath, $format));
         }
 
-        if ($format !== 'json' && $format !== 'github') {
+        if (! in_array($format, ['json', 'sarif', 'github'], true)) {
             $this->newLine();
         }
 

@@ -39,7 +39,8 @@ class ObfuscatedCodeScanner extends BaseScanner
         }
 
         $finder = $this->createFinder($basePath);
-        $finder->name('*.php');
+        $extensions = array_map(static fn (string $extension): string => preg_quote($extension, '/'), $this->getSuspiciousPhpExtensions());
+        $finder->name('/\.(?:'.implode('|', $extensions).')$/i');
 
         // Materialize the file list so progress can report a total upfront
         $filesArray = iterator_to_array($finder, false);
@@ -83,39 +84,33 @@ class ObfuscatedCodeScanner extends BaseScanner
         $handle = @fopen($filePath, 'r');
 
         if ($handle === false) {
-            return;
+            throw new \RuntimeException("Unable to read PHP file '{$relativePath}'.");
         }
 
-        $lineNumber = 0;
-
         try {
-            while (($line = fgets($handle)) !== false) {
-                $lineNumber++;
+            $source = stream_get_contents($handle);
+            if ($source === false) {
+                return;
+            }
+            $code = $this->removeCommentsPreservingLines($source);
+            foreach ($patterns as $key => $patternDef) {
+                if (in_array($key, ['long_encoded_string', 'variable_functions', 'chr_chaining'], true)) {
+                    foreach (explode("\n", $code) as $index => $line) {
+                        $lineNumber = $index + 1;
+                        if ($key === 'long_encoded_string') {
+                            $this->checkLongEncodedString($line, $lineNumber, $relativePath, $findings);
+                        } elseif ($key === 'variable_functions') {
+                            $this->checkVariableFunctions($line, $lineNumber, $relativePath, $findings);
+                        } else {
+                            $this->checkChrChaining($line, $lineNumber, $relativePath, $findings);
+                        }
+                    }
 
-                if ($this->isCommentLine($line)) {
                     continue;
                 }
-
-                foreach ($patterns as $key => $patternDef) {
-                    if ($key === 'long_encoded_string') {
-                        $this->checkLongEncodedString($line, $lineNumber, $relativePath, $findings);
-
-                        continue;
-                    }
-
-                    if ($key === 'variable_functions') {
-                        $this->checkVariableFunctions($line, $lineNumber, $relativePath, $findings);
-
-                        continue;
-                    }
-
-                    if ($key === 'chr_chaining') {
-                        $this->checkChrChaining($line, $lineNumber, $relativePath, $findings);
-
-                        continue;
-                    }
-
-                    if (! empty($patternDef['pattern']) && preg_match($patternDef['pattern'], $line) === 1) {
+                if (! empty($patternDef['pattern']) && preg_match_all($patternDef['pattern'], $code, $matches, PREG_OFFSET_CAPTURE)) {
+                    foreach ($matches[0] as $match) {
+                        $lineNumber = substr_count(substr($code, 0, $match[1]), "\n") + 1;
                         $findings->add(Finding::make(
                             severity: $patternDef['severity'],
                             file: $relativePath,
@@ -129,6 +124,21 @@ class ObfuscatedCodeScanner extends BaseScanner
         } finally {
             fclose($handle);
         }
+    }
+
+    /** Remove PHP comments while preserving newlines for accurate reporting. */
+    private function removeCommentsPreservingLines(string $source): string
+    {
+        $result = '';
+        foreach (token_get_all($source) as $token) {
+            if (is_array($token) && in_array($token[0], [T_COMMENT, T_DOC_COMMENT], true)) {
+                $result .= preg_replace('/[^\r\n]/', ' ', $token[1]) ?? '';
+            } else {
+                $result .= is_array($token) ? $token[1] : $token;
+            }
+        }
+
+        return $result;
     }
 
     /**
@@ -240,31 +250,6 @@ class ObfuscatedCodeScanner extends BaseScanner
                 ));
             }
         }
-    }
-
-    /**
-     * Determine if a line is a PHP comment line.
-     */
-    private function isCommentLine(string $line): bool
-    {
-        $trimmed = ltrim($line);
-
-        if (str_starts_with($trimmed, '//') || str_starts_with($trimmed, '#')) {
-            return true;
-        }
-
-        if (str_starts_with($trimmed, '/*') || str_starts_with($trimmed, '*')) {
-            return true;
-        }
-
-        // Laravel config files use "|"-prefixed lines inside /* */ blocks.
-        // Treat them as comment continuations to avoid false positives on
-        // inline code references such as `storage:link`.
-        if (str_starts_with($trimmed, '|')) {
-            return true;
-        }
-
-        return false;
     }
 
     /**

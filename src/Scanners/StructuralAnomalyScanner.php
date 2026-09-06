@@ -59,18 +59,13 @@ class StructuralAnomalyScanner extends BaseScanner
 
             // Match plain PHP files (*.php) as well as double-extension
             // smuggles (*.php.jpg)
-            $nameGlobs = [];
-
-            foreach ($phpExtensions as $extension) {
-                $nameGlobs[] = '*.'.$extension;
-                $nameGlobs[] = '*.'.$extension.'.*';
-            }
+            $extensionPattern = implode('|', array_map(static fn (string $extension): string => preg_quote($extension, '/'), $phpExtensions));
 
             $finder->in($zonePath)
                 ->files()
                 ->ignoreDotFiles(false)
                 ->ignoreVCS(true)
-                ->name($nameGlobs);
+                ->name('/\.(?:'.$extensionPattern.')(?:\..*)?$/i');
 
             foreach ($finder as $file) {
                 $realPath = $file->getRealPath();

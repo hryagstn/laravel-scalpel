@@ -126,8 +126,8 @@ class HtaccessScanner extends BaseScanner
 
                 $results[] = $fullPath;
             }
-        } catch (\UnexpectedValueException) {
-            // Directory not readable — skip silently
+        } catch (\UnexpectedValueException $exception) {
+            throw new \RuntimeException("Unable to traverse '{$basePath}' while scanning {$filename} files.", 0, $exception);
         }
 
         return $results;
@@ -293,7 +293,7 @@ class HtaccessScanner extends BaseScanner
         }
 
         $directive = strtolower($matches[2]);
-        $value = strtolower(trim($matches[3]));
+        $value = strtolower(trim($matches[3], " \t\"'"));
 
         foreach (self::DANGEROUS_PHP_DIRECTIVES as $dangerous) {
             if ($directive !== $dangerous) {
@@ -349,7 +349,7 @@ class HtaccessScanner extends BaseScanner
         string $relativePath,
         FindingCollection $findings,
     ): void {
-        if (preg_match('/^Options\s+.*\+?ExecCGI/i', $line) !== 1) {
+        if (preg_match('/^Options\s+(?!.*(?:^|\s)-ExecCGI\b).*\+ExecCGI\b/i', $line) !== 1) {
             return;
         }
 
