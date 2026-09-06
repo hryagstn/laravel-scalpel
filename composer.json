@@ -24,7 +24,7 @@
         "illuminate/config": "^10.0|^11.0|^12.0|^13.0",
         "illuminate/filesystem": "^10.0|^11.0|^12.0|^13.0",
         "illuminate/support": "^10.0|^11.0|^12.0|^13.0",
-        "symfony/finder": "^6.0|^7.0"
+        "symfony/finder": "^6.0|^7.0|^8.0"
     },
     "require-dev": {
         "larastan/larastan": "^2.9|^3.0",
