@@ -5,6 +5,12 @@ All notable changes to `laravel-scalpel` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.2] - 2026-09-07
+
+### Fixed
+- Added backward compatibility for `Finding::make()` and `Finding::__construct()` to support both `$scannerName` (camelCase) and legacy `$scanner_name` (snake_case) named arguments in PHP 8.
+- Added public `$scanner_name` property alias on `Finding` to preserve compatibility with legacy code and custom scanner implementations.
+
 ## [1.8.0] - 2026-09-06
 
 ### Security
