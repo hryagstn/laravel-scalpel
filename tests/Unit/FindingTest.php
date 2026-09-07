@@ -37,6 +37,46 @@ class FindingTest extends TestCase
         $this->assertEquals($expectedArray, $finding->toArray());
     }
 
+    public function test_supports_legacy_snake_case_scanner_name_named_parameter(): void
+    {
+        $finding = Finding::make(
+            severity: Severity::HIGH,
+            file: 'public/index.php',
+            line: null,
+            description: 'Suspicious change',
+            scanner_name: 'Baseline Diff'
+        );
+
+        $this->assertEquals('Baseline Diff', $finding->scannerName);
+        $this->assertEquals('Baseline Diff', $finding->scanner_name);
+        $this->assertEquals('Baseline Diff', $finding->toArray()['scanner']);
+    }
+
+    public function test_constructor_supports_both_named_parameters(): void
+    {
+        $finding1 = new Finding(
+            severity: Severity::MEDIUM,
+            file: 'config/app.php',
+            line: 15,
+            description: 'Env mismatch',
+            scannerName: 'Env Integrity'
+        );
+
+        $this->assertEquals('Env Integrity', $finding1->scannerName);
+        $this->assertEquals('Env Integrity', $finding1->scanner_name);
+
+        $finding2 = new Finding(
+            severity: Severity::MEDIUM,
+            file: 'config/app.php',
+            line: 15,
+            description: 'Env mismatch',
+            scanner_name: 'Env Integrity'
+        );
+
+        $this->assertEquals('Env Integrity', $finding2->scannerName);
+        $this->assertEquals('Env Integrity', $finding2->scanner_name);
+    }
+
     public function test_severity_levels(): void
     {
         $this->assertEquals(4, Severity::CRITICAL->weight());
