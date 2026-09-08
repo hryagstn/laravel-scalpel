@@ -54,7 +54,7 @@ class ObfuscatedCodeScanner extends BaseScanner
             if ($realPath === false) {
                 continue;
             }
-            $relativePath = $this->relativePath($realPath, $basePath);
+            $relativePath = $file->getRelativePathname();
             $this->scanFile($realPath, $relativePath, $patterns, $findings);
 
             $processed++;
@@ -64,6 +64,13 @@ class ObfuscatedCodeScanner extends BaseScanner
                 'file' => $relativePath,
             ]);
         }
+
+        foreach ($finder->getUnreadablePaths() as $unreadablePath) {
+            $relativePath = $this->relativePath($unreadablePath, $basePath);
+            $findings->addDirectoryError($relativePath, 'Unable to open directory for reading.', $this->name());
+        }
+
+        $findings->setScannerStatus($this->name(), $findings->hasErrors() ? 'partial' : 'complete');
 
         $this->notifyProgress('finish');
 
@@ -81,11 +88,22 @@ class ObfuscatedCodeScanner extends BaseScanner
         array $patterns,
         FindingCollection $findings,
     ): void {
+        $fileSize = @filesize($filePath);
+        if ($fileSize !== false && $fileSize > 2 * 1024 * 1024) {
+            $findings->addError($relativePath, sprintf('File exceeds maximum scan size limit (2MB, actual: %.2fMB) and was skipped.', $fileSize / 1048576), $this->name());
+
+            return;
+        }
+
         $handle = @fopen($filePath, 'r');
 
         if ($handle === false) {
-            throw new \RuntimeException("Unable to read PHP file '{$relativePath}'.");
+            $findings->addError($relativePath, 'Unable to read PHP file for scanning.', $this->name());
+
+            return;
         }
+
+        $findings->incrementScannedFiles(1);
 
         try {
             $source = stream_get_contents($handle);
@@ -129,6 +147,10 @@ class ObfuscatedCodeScanner extends BaseScanner
     /** Remove PHP comments while preserving newlines for accurate reporting. */
     private function removeCommentsPreservingLines(string $source): string
     {
+        if (! str_contains($source, '/*') && ! str_contains($source, '//') && ! str_contains($source, '#')) {
+            return $source;
+        }
+
         $result = '';
         foreach (token_get_all($source) as $token) {
             if (is_array($token) && in_array($token[0], [T_COMMENT, T_DOC_COMMENT], true)) {

@@ -156,7 +156,7 @@ php artisan scalpel:scan --fail-on=MEDIUM
 
 | Option            | Description                                                                 |
 |-------------------|-----------------------------------------------------------------------------|
-| `--only`          | Comma-separated list of scanners to run: `structural`, `obfuscated`, `htaccess`, `baseline`, `env` |
+| `--only`          | Comma-separated list of scanners to run: `structural`, `obfuscated`, `htaccess`, `userini`, `baseline`, `env` |
 | `--format`        | Output format: `table` (default), `json`, `github`, or `sarif`              |
 | `--fast`          | Enable metadata-based fast scan (Deferred Hashing) for this execution.      |
 | `--include-vendor`| Include the `vendor/` directory in content scanning (slower).               |
@@ -165,11 +165,11 @@ php artisan scalpel:scan --fail-on=MEDIUM
 
 **Exit codes:**
 
-| Code | Meaning                                                        |
-|------|----------------------------------------------------------------|
-| `0`  | No findings (clean)                                            |
-| `1`  | Findings detected at or above the `--fail-on` threshold        |
-| `2`  | Findings detected below the threshold                          |
+| Code | Meaning                                                                      |
+|------|------------------------------------------------------------------------------|
+| `0`  | Clean and complete scan (no findings detected and all paths inspected)       |
+| `1`  | Findings detected at or above the `--fail-on` threshold                      |
+| `2`  | Findings detected below threshold, or incomplete scan due to read/traversal errors (`partial` / `failed` status) |
 
 ---
 
@@ -261,13 +261,20 @@ Each pattern can be individually toggled in the configuration.
 
 Scans all `.htaccess` files in your project for dangerous directives that could allow execution of non-PHP scripts. Attackers often modify `.htaccess` to register Python, Perl, or CGI handlers, enabling them to run arbitrary scripts through the web server.
 
-Also scans `.user.ini` files — the PHP-FPM equivalent of `.htaccess` PHP directives, and a classic persistence vector (`auto_prepend_file = shell.txt` executes the attacker's file with every request).
-
 Detects:
 - `AddHandler` directives mapping to dangerous script types
 - `AddType` directives mapping to dangerous MIME types
 - Custom handler registrations for `cgi-script`, `python-program`, `perl-script`, etc.
 - Dangerous PHP directives: `allow_url_include`, `auto_prepend_file`, `auto_append_file`, emptied `disable_functions`, and more
+
+### UserIni Scanner
+
+Scans all `.user.ini` files across your project — the PHP-FPM equivalent of `.htaccess` PHP directives, and a classic persistence vector (`auto_prepend_file = shell.txt` executes the attacker's file with every request).
+
+Detects:
+- Dangerous PHP directives: `auto_prepend_file`, `auto_append_file`, `allow_url_include`, `disable_functions`, etc.
+- Files with hidden execution vectors across all project directories
+- Can be run directly via `--only=userini` (or alongside `.htaccess` via legacy `--only=htaccess`)
 
 ### Baseline Diff Scanner
 

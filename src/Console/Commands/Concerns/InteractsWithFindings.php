@@ -36,16 +36,25 @@ trait InteractsWithFindings
     /**
      * Resolve the process exit code from the findings.
      *
-     * 0 = clean, 1 = findings at or above the failure severity
-     * (--fail-on, default HIGH), 2 = findings below that threshold.
+     * 1 = findings at or above failure severity (--fail-on, default HIGH).
+     * 2 = incomplete scan (partial or failed status) or findings below threshold.
+     * 0 = complete clean scan with no findings.
      */
     public function resolveExitCode(FindingCollection $findings): int
     {
-        if ($findings->isEmpty()) {
-            return 0;
+        if ($findings->hasSeverity($this->failOnSeverity())) {
+            return 1;
         }
 
-        return $findings->hasSeverity($this->failOnSeverity()) ? 1 : 2;
+        if (in_array($findings->status(), ['partial', 'failed'], true)) {
+            return 2;
+        }
+
+        if (! $findings->isEmpty()) {
+            return 2;
+        }
+
+        return 0;
     }
 
     /**

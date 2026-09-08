@@ -5,6 +5,24 @@ All notable changes to `laravel-scalpel` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] - 2026-09-08
+
+### Added
+- **Standalone `UserIniScanner`**: Project-wide scanning for `.user.ini` PHP-FPM persistence vectors across the entire repository (using global exclusions), with new CLI alias `userini`.
+- **Backward compatibility delegation for `--only=htaccess`**: Running `--only=htaccess` automatically delegates to both `HtaccessScanner` and `UserIniScanner`, preserving `.user.ini` detection for legacy CLI workflows without duplicate scanner execution in default scans.
+- **SafeFinder Symlink Engine**: Cycle-safe directory symlink traversal tracking visited realpaths, preserving logical project-relative paths across all scanners.
+- **Operational Error & Status Tracking**: Added `complete`, `partial`, and `failed` status reporting, separate `skippedFilesCount` and `skippedDirectoriesCount`, and structured operational error recording in `FindingCollection`.
+- **OASIS SARIF 2.1.0 Compliance**: Enriched SARIF output with `toolExecutionNotifications`, execution `properties` (`status`, `scannedFiles`, `skippedFiles`, `skippedDirectories`), and proper schema compliance (omitting `region` when findings apply to the whole file without line numbers).
+
+### Fixed
+- **Status merge commutativity**: Fixed status resolution in `FindingCollection::merge()` to be order-independent across all permutations of complete, partial, failed, and unreadable scans.
+- **Baseline snapshot protection**: Prevented `createBaseline` from overwriting valid existing snapshots if traversal or file reading fails.
+- **False-deletion prevention on unreadable roots/subtrees**: Missing files under unreadable roots or ancestor directories are recorded as operational errors rather than falsely flagged as `DELETED`.
+- **Baseline symlink path normalization**: Baseline snapshots now consistently store logical project-relative paths (`public/symlink_dir/file.php`) instead of leaking physical target paths on disk.
+- **Progress callback cleanup**: Scanner progress callbacks are guaranteed to be cleaned up in a `finally` block even when unexpected exceptions occur.
+- **Strict exit code hierarchy**: Findings $\ge$ threshold (1) $\rightarrow$ Incomplete scan / findings $<$ threshold (2) $\rightarrow$ Clean and complete scan (0).
+- **PHPStan Level Max**: Upgraded static analysis to PHPStan Level Max with 0 errors across the entire codebase.
+
 ## [1.8.2] - 2026-09-07
 
 ### Fixed

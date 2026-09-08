@@ -6,7 +6,6 @@ namespace Hryagstn\Scalpel\Scanners;
 
 use Hryagstn\Scalpel\Contracts\ScannerInterface;
 use Hryagstn\Scalpel\Data\FindingCollection;
-use Symfony\Component\Finder\Finder;
 
 abstract class BaseScanner implements ScannerInterface
 {
@@ -116,24 +115,18 @@ abstract class BaseScanner implements ScannerInterface
     }
 
     /**
-     * Create a Finder instance for the given base path with excluded paths.
+     * Create a SafeFinder instance for the given base path with excluded paths.
      *
-     * Uses Finder::exclude() for directories — this prevents Finder from
-     * traversing into excluded directories entirely, which is significantly
-     * faster than notPath() which filters after traversal.
+     * Cycle-safe and symlink-aware: always follows directory symlinks
+     * with cycle detection.
      *
-     * Uses Finder::notPath() only for file-level exclusions.
-     *
-     * By default, uses content_scan_excluded_paths (global + content-scan-specific).
-     * Pass a custom list to override.
-     *
-     * @param  string[]  $excludedPaths
+     * @param  string[]|null  $excludedPaths
      */
-    protected function createFinder(string $basePath, ?array $excludedPaths = null): Finder
+    protected function createFinder(string $basePath, ?array $excludedPaths = null): SafeFinder
     {
         $excludedPaths ??= $this->getContentScanExcludedPaths();
 
-        $finder = new Finder;
+        $finder = new SafeFinder;
         $finder->in($basePath)
             ->files()
             ->ignoreDotFiles(false)
@@ -159,8 +152,8 @@ abstract class BaseScanner implements ScannerInterface
             $finder->exclude($excludedDirs);
         }
 
-        foreach ($excludedFiles as $file) {
-            $finder->notPath($file);
+        if (! empty($excludedFiles)) {
+            $finder->notPath($excludedFiles);
         }
 
         return $finder;
@@ -172,11 +165,16 @@ abstract class BaseScanner implements ScannerInterface
     protected function relativePath(string $fullPath, string $basePath): string
     {
         // Normalize separators to forward slash for cross-platform compatibility
-        $fullPath = str_replace('\\', '/', $fullPath);
-        $basePath = str_replace('\\', '/', rtrim($basePath, '/\\')).'/';
+        $fullPath = rtrim(str_replace('\\', '/', $fullPath), '/');
+        $basePathNorm = rtrim(str_replace('\\', '/', $basePath), '/');
 
-        if (str_starts_with($fullPath, $basePath)) {
-            return substr($fullPath, strlen($basePath));
+        if ($fullPath === $basePathNorm) {
+            return '.';
+        }
+
+        $basePathWithSlash = $basePathNorm.'/';
+        if (str_starts_with($fullPath, $basePathWithSlash)) {
+            return substr($fullPath, strlen($basePathWithSlash));
         }
 
         return $fullPath;

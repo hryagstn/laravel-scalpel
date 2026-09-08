@@ -24,12 +24,14 @@ trait HasScannerProgress
             $progressBar = null;
             $scanner->setProgressCallback(function (string $event, array $data) use (&$progressBar) {
                 if ($event === 'start') {
-                    $progressBar = $this->output->createProgressBar($data['total']);
+                    $total = isset($data['total']) && is_numeric($data['total']) ? (int) $data['total'] : 0;
+                    $progressBar = $this->output->createProgressBar($total);
                     $progressBar->setFormat('  %current%/%max% [%bar%] %percent:3s%% -- %message%');
                     $progressBar->setMessage('Scanning files...');
                     $progressBar->start();
                 } elseif ($event === 'advance' && $progressBar) {
-                    $message = (string) ($data['file'] ?? '');
+                    $rawFile = $data['file'] ?? '';
+                    $message = is_string($rawFile) || is_numeric($rawFile) ? (string) $rawFile : '';
                     if (strlen($message) > 40) {
                         $message = '...'.substr($message, -37);
                     }
@@ -43,10 +45,19 @@ trait HasScannerProgress
             });
         }
 
-        $findings = $scanner->scan($basePath);
-
-        if ($hasProgress) {
-            $scanner->setProgressCallback(null);
+        try {
+            $findings = $scanner->scan($basePath);
+            if (! $findings->hasErrors() && $findings->status() === 'complete') {
+                $findings->setScannerStatus($scanner->name(), 'complete');
+            }
+        } catch (\Throwable $exception) {
+            $findings = new FindingCollection;
+            $findings->addError($basePath, 'Scanner failed with exception: '.$exception->getMessage(), $scanner->name());
+            $findings->setScannerStatus($scanner->name(), 'failed');
+        } finally {
+            if ($scanner instanceof BaseScanner) {
+                $scanner->setProgressCallback(null);
+            }
         }
 
         return $findings;

@@ -12,3 +12,4 @@ Thumbs.db
 
 # graphify knowledge graph output
 graphify-out/
+.opencode/

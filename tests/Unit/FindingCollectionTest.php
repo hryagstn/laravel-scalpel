@@ -91,4 +91,101 @@ class FindingCollectionTest extends TestCase
         ]);
         $this->assertFalse($collection2->hasCriticalOrHigh());
     }
+
+    public function test_with_finding_is_immutable(): void
+    {
+        $collection = new FindingCollection;
+        $finding = Finding::make(Severity::LOW, 'test.php', 1, 'Notice', 'Test');
+
+        $newCollection = $collection->withFinding($finding);
+
+        $this->assertCount(0, $collection);
+        $this->assertCount(1, $newCollection);
+        $this->assertNotSame($collection, $newCollection);
+    }
+
+    public function test_directory_errors_increment_directory_counter_not_files(): void
+    {
+        $collection = new FindingCollection;
+        $collection->addDirectoryError('storage/secret', 'Permission denied', 'Test Scanner');
+
+        $this->assertSame(0, $collection->skippedFilesCount());
+        $this->assertSame(1, $collection->skippedDirectoriesCount());
+        $this->assertTrue($collection->hasErrors());
+        $this->assertTrue($collection->errors()[0]['is_directory']);
+    }
+
+    public function test_filter_by_severity_preserves_operational_metadata(): void
+    {
+        $collection = new FindingCollection([
+            Finding::make(Severity::LOW, 'low.php', 1, 'Low issue', 'Scanner'),
+            Finding::make(Severity::HIGH, 'high.php', 2, 'High issue', 'Scanner'),
+        ]);
+        $collection->incrementScannedFiles(50);
+        $collection->addError('bad.php', 'Read failed', 'Scanner');
+        $collection->addDirectoryError('unreadable_dir', 'Cannot open', 'Scanner');
+        $collection->setScannerStatus('Scanner', 'partial');
+
+        $filtered = $collection->filterBySeverity(Severity::HIGH);
+
+        $this->assertCount(1, $filtered);
+        $this->assertSame(50, $filtered->scannedFilesCount());
+        $this->assertSame(1, $filtered->skippedFilesCount());
+        $this->assertSame(1, $filtered->skippedDirectoriesCount());
+        $this->assertCount(2, $filtered->errors());
+        $this->assertSame('partial', $filtered->status());
+    }
+
+    public function test_status_aggregation_per_scanner(): void
+    {
+        // 1. All complete
+        $c1 = new FindingCollection;
+        $c1->setScannerStatus('Scanner A', 'complete');
+        $c1->setScannerStatus('Scanner B', 'complete');
+        $this->assertSame('complete', $c1->status());
+
+        // 2. All failed
+        $c2 = new FindingCollection;
+        $c2->setScannerStatus('Scanner A', 'failed');
+        $c2->setScannerStatus('Scanner B', 'failed');
+        $this->assertSame('failed', $c2->status());
+
+        // 3. Mixed: 1 complete, 1 failed -> partial
+        $c3 = new FindingCollection;
+        $c3->setScannerStatus('Scanner A', 'complete');
+        $c3->setScannerStatus('Scanner B', 'failed');
+        $this->assertSame('partial', $c3->status());
+
+        // 4. Merge preserves aggregate status
+        $merged = (new FindingCollection)->setScannerStatus('Scanner A', 'complete');
+        $merged->merge((new FindingCollection)->setScannerStatus('Scanner B', 'failed'));
+        $this->assertSame('partial', $merged->status());
+    }
+
+    public function test_merge_order_commutativity_across_all_statuses(): void
+    {
+        $factory = [
+            'empty' => fn () => new FindingCollection,
+            'complete_explicit' => fn () => (new FindingCollection)->markComplete(),
+            'partial_explicit' => fn () => (new FindingCollection)->markPartial(),
+            'failed_explicit' => fn () => (new FindingCollection)->markFailed(),
+            'complete_scanner' => fn () => (new FindingCollection)->setScannerStatus('Scan', 'complete')->incrementScannedFiles(5),
+            'partial_scanner' => fn () => (new FindingCollection)->setScannerStatus('Scan', 'partial')->incrementScannedFiles(3),
+            'failed_scanner' => fn () => (new FindingCollection)->setScannerStatus('Scan', 'failed'),
+            'error_implicit' => fn () => (new FindingCollection)->addError('file.php', 'cannot read', 'Scan'),
+        ];
+
+        foreach ($factory as $key1 => $fn1) {
+            foreach ($factory as $key2 => $fn2) {
+                $c1_then_c2 = $fn1()->merge($fn2());
+                $c2_then_c1 = $fn2()->merge($fn1());
+
+                $this->assertSame(
+                    $c1_then_c2->status(),
+                    $c2_then_c1->status(),
+                    "Merge status mismatch for ({$key1}, {$key2}) vs ({$key2}, {$key1}): {$c1_then_c2->status()} vs {$c2_then_c1->status()}",
+                );
+            }
+        }
+    }
 }

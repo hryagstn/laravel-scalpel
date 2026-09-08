@@ -7,7 +7,6 @@ namespace Hryagstn\Scalpel\Scanners;
 use Hryagstn\Scalpel\Data\Finding;
 use Hryagstn\Scalpel\Data\FindingCollection;
 use Hryagstn\Scalpel\Data\Severity;
-use Symfony\Component\Finder\Finder;
 
 class StructuralAnomalyScanner extends BaseScanner
 {
@@ -55,7 +54,7 @@ class StructuralAnomalyScanner extends BaseScanner
                 continue;
             }
 
-            $finder = new Finder;
+            $finder = new SafeFinder;
 
             // Match plain PHP files (*.php) as well as double-extension
             // smuggles (*.php.jpg)
@@ -68,11 +67,12 @@ class StructuralAnomalyScanner extends BaseScanner
                 ->name('/\.(?:'.$extensionPattern.')(?:\..*)?$/i');
 
             foreach ($finder as $file) {
+                $findings->incrementScannedFiles(1);
                 $realPath = $file->getRealPath();
                 if ($realPath === false) {
                     continue;
                 }
-                $relativePath = $this->relativePath($realPath, $basePath);
+                $relativePath = $zone.'/'.$file->getRelativePathname();
 
                 // Skip globally excluded paths
                 if ($this->isExcluded($relativePath, $excludedPaths)) {
@@ -113,7 +113,14 @@ class StructuralAnomalyScanner extends BaseScanner
                     scannerName: $this->name(),
                 ));
             }
+
+            foreach ($finder->getUnreadablePaths() as $unreadablePath) {
+                $relativePath = $this->relativePath($unreadablePath, $basePath);
+                $findings->addDirectoryError($relativePath, 'Unable to open directory for reading.', $this->name());
+            }
         }
+
+        $findings->setScannerStatus($this->name(), $findings->hasErrors() ? 'partial' : 'complete');
 
         return $findings;
     }

@@ -9,7 +9,6 @@ use Hryagstn\Scalpel\Data\FindingCollection;
 use Hryagstn\Scalpel\Data\Severity;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Storage;
-use Symfony\Component\Finder\Finder;
 
 class BaselineDiffScanner extends BaseScanner
 {
@@ -38,6 +37,11 @@ class BaselineDiffScanner extends BaseScanner
     public function createBaseline(string $basePath): array
     {
         $basePath = rtrim($basePath, '/');
+
+        if (! is_readable($basePath)) {
+            throw new \RuntimeException("Cannot create baseline snapshot: root directory {$basePath} is not readable.");
+        }
+
         $excludedPaths = $this->getBaselineExcludedPaths();
 
         $finder = $this->createBaselineFinder($basePath, $excludedPaths);
@@ -63,23 +67,26 @@ class BaselineDiffScanner extends BaseScanner
         $processed = 0;
 
         foreach ($filesArray as $file) {
-            $realPath = $file->getRealPath();
-            if ($realPath === false) {
-                continue;
-            }
-
-            $relativePath = $this->relativePath($file->getPathname(), $basePath);
+            $relativePath = $file->getRelativePathname();
 
             if ($this->isExcluded($relativePath, $excludedPaths)) {
                 continue;
             }
 
-            $fileSize = $file->getSize();
-            $modifiedAt = $file->getMTime();
+            $realPath = $file->getRealPath();
+            if ($realPath === false) {
+                throw new \RuntimeException("Cannot create baseline snapshot: unable to resolve path for {$relativePath}.");
+            }
 
-            // Skip files whose metadata cannot be read
+            try {
+                $fileSize = $file->getSize();
+                $modifiedAt = $file->getMTime();
+            } catch (\Throwable $e) {
+                throw new \RuntimeException("Cannot create baseline snapshot: metadata could not be read for {$relativePath}: ".$e->getMessage(), 0, $e);
+            }
+
             if ($fileSize === false || $modifiedAt === false) {
-                continue;
+                throw new \RuntimeException("Cannot create baseline snapshot: metadata could not be read for {$relativePath}.");
             }
             $totalSize += $fileSize;
 
@@ -98,11 +105,10 @@ class BaselineDiffScanner extends BaseScanner
             }
 
             if ($hash === null) {
-                $hash = hash_file('sha256', $realPath);
+                $hash = @hash_file('sha256', $realPath);
 
-                // Skip unreadable files — a hash is required for diffing
                 if ($hash === false) {
-                    continue;
+                    throw new \RuntimeException("Cannot create baseline snapshot: file content could not be hashed for {$relativePath}.");
                 }
             }
 
@@ -121,6 +127,16 @@ class BaselineDiffScanner extends BaseScanner
         }
 
         $this->notifyProgress('finish');
+
+        $unreadable = $finder->getUnreadablePaths();
+        if ($unreadable !== []) {
+            $unreadableDirs = array_map(fn (string $p) => $this->relativePath($p, $basePath), $unreadable);
+            throw new \RuntimeException(sprintf(
+                'Cannot create baseline snapshot: %d directory(ies) could not be traversed (%s). Refusing to overwrite baseline with incomplete state.',
+                count($unreadableDirs),
+                implode(', ', array_slice($unreadableDirs, 0, 3)),
+            ));
+        }
 
         $baselineData = [
             'schema_version' => self::BASELINE_SCHEMA_VERSION,
@@ -191,6 +207,13 @@ class BaselineDiffScanner extends BaseScanner
         $findings = new FindingCollection;
         $basePath = rtrim($basePath, '/');
 
+        if (! is_readable($basePath)) {
+            $findings->addDirectoryError('.', 'Root directory is not readable.', $this->name());
+            $findings->setScannerStatus($this->name(), 'failed');
+
+            return $findings;
+        }
+
         if (! $this->baselineExists()) {
             $findings->add(Finding::make(
                 severity: Severity::MEDIUM,
@@ -250,7 +273,8 @@ class BaselineDiffScanner extends BaseScanner
         /** @var array<string, array{hash: string, size: int, modified_at: int}> $baselineFiles */
         $baselineFiles = $baseline['files'] ?? [];
         $excludedPaths = $this->getBaselineExcludedPaths();
-        $currentFiles = $this->buildCurrentFileMap($basePath, $excludedPaths, $baselineFiles);
+        $currentFiles = $this->buildCurrentFileMap($basePath, $excludedPaths, $baselineFiles, $findings);
+        $findings->incrementScannedFiles(count($currentFiles));
 
         // Check for NEW and MODIFIED files
         foreach ($currentFiles as $relativePath => $fileData) {
@@ -282,8 +306,57 @@ class BaselineDiffScanner extends BaseScanner
         }
 
         // Check for DELETED files
-        foreach ($baselineFiles as $relativePath => $baselineData) {
-            if (! isset($currentFiles[$relativePath])) {
+        $erroredFilesMap = [];
+        foreach ($findings->errors() as $error) {
+            $erroredFilesMap[$error['file']] = true;
+        }
+
+        $unreadableDirs = [];
+        $rootUnreadable = false;
+        $realBasePath = realpath($basePath);
+        foreach ($findings->errors() as $error) {
+            if (! empty($error['is_directory'])) {
+                $dir = trim(rtrim($error['file'], '/'));
+                if ($dir === '' || $dir === '.' || $dir === $basePath || ($realBasePath !== false && $dir === $realBasePath)) {
+                    $rootUnreadable = true;
+                } else {
+                    $unreadableDirs[] = $dir;
+                }
+            }
+        }
+
+        if (! $rootUnreadable) {
+            foreach ($baselineFiles as $relativePath => $baselineData) {
+                if (isset($currentFiles[$relativePath])) {
+                    continue;
+                }
+
+                // If the file encountered an inspection/read error during scan, it was not deleted
+                if (isset($erroredFilesMap[$relativePath])) {
+                    continue;
+                }
+
+                $fullPath = $basePath.'/'.$relativePath;
+
+                // If the file still exists on disk (or is a link), it was not deleted
+                if (file_exists($fullPath) || is_link($fullPath)) {
+                    $findings->addError($relativePath, 'File exists on disk but could not be inspected during scan.', $this->name());
+
+                    continue;
+                }
+
+                // If an ancestor directory could not be traversed, we cannot determine deletion
+                $inUnreadableDir = false;
+                foreach ($unreadableDirs as $unreadableDir) {
+                    if ($relativePath === $unreadableDir || str_starts_with($relativePath, $unreadableDir.'/')) {
+                        $inUnreadableDir = true;
+                        break;
+                    }
+                }
+                if ($inUnreadableDir) {
+                    continue;
+                }
+
                 $findings->add(Finding::make(
                     severity: $this->severityForDeleted($relativePath),
                     file: $relativePath,
@@ -293,6 +366,8 @@ class BaselineDiffScanner extends BaseScanner
                 ));
             }
         }
+
+        $findings->setScannerStatus($this->name(), $findings->hasErrors() ? ($findings->scannedFilesCount() > 0 ? 'partial' : 'failed') : 'complete');
 
         return $findings;
     }
@@ -324,37 +399,9 @@ class BaselineDiffScanner extends BaseScanner
      *
      * @param  string[]  $excludedPaths
      */
-    private function createBaselineFinder(string $basePath, array $excludedPaths): Finder
+    private function createBaselineFinder(string $basePath, array $excludedPaths): SafeFinder
     {
-        $finder = new Finder;
-        $finder->in($basePath)
-            ->files()
-            ->ignoreDotFiles(false)
-            ->ignoreVCS(true);
-
-        $excludedDirs = [];
-        $excludedFiles = [];
-
-        foreach ($excludedPaths as $excluded) {
-            $excluded = rtrim($excluded, '/');
-            $fullPath = rtrim($basePath, '/').'/'.$excluded;
-
-            if (is_dir($fullPath)) {
-                $excludedDirs[] = $excluded;
-            } else {
-                $excludedFiles[] = $excluded;
-            }
-        }
-
-        if (! empty($excludedDirs)) {
-            $finder->exclude($excludedDirs);
-        }
-
-        foreach ($excludedFiles as $file) {
-            $finder->notPath($file);
-        }
-
-        return $finder;
+        return $this->createFinder($basePath, $excludedPaths);
     }
 
     /**
@@ -471,7 +518,7 @@ class BaselineDiffScanner extends BaseScanner
      * @param  array<string, array{hash: string, size: int, modified_at: int}>|null  $baselineFiles
      * @return array<string, array{hash: string, size: int, modified_at: int}>
      */
-    private function buildCurrentFileMap(string $basePath, array $excludedPaths, ?array $baselineFiles = null): array
+    private function buildCurrentFileMap(string $basePath, array $excludedPaths, ?array $baselineFiles = null, ?FindingCollection $findings = null): array
     {
         $finder = $this->createBaselineFinder($basePath, $excludedPaths);
 
@@ -484,14 +531,18 @@ class BaselineDiffScanner extends BaseScanner
         $processed = 0;
 
         foreach ($filesArray as $file) {
-            $realPath = $file->getRealPath();
-            if ($realPath === false) {
+            $relativePath = $file->getRelativePathname();
+
+            if ($this->isExcluded($relativePath, $excludedPaths)) {
                 continue;
             }
 
-            $relativePath = $this->relativePath($file->getPathname(), $basePath);
+            $realPath = $file->getRealPath();
+            if ($realPath === false) {
+                if ($findings !== null) {
+                    $findings->addError($relativePath, 'Unable to resolve real path for file.', $this->name());
+                }
 
-            if ($this->isExcluded($relativePath, $excludedPaths)) {
                 continue;
             }
 
@@ -500,6 +551,10 @@ class BaselineDiffScanner extends BaseScanner
 
             // Skip files whose metadata cannot be read
             if ($fileSize === false || $modifiedAt === false) {
+                if ($findings !== null) {
+                    $findings->addError($relativePath, 'Unable to read file metadata.', $this->name());
+                }
+
                 continue;
             }
 
@@ -518,6 +573,10 @@ class BaselineDiffScanner extends BaseScanner
 
                 // Skip unreadable files — a hash is required for diffing
                 if ($hash === false) {
+                    if ($findings !== null) {
+                        $findings->addError($relativePath, 'Unable to read file content for hashing.', $this->name());
+                    }
+
                     continue;
                 }
             }
@@ -534,6 +593,13 @@ class BaselineDiffScanner extends BaseScanner
                 'total' => $totalFiles,
                 'file' => $relativePath,
             ]);
+        }
+
+        if ($findings !== null) {
+            foreach ($finder->getUnreadablePaths() as $unreadablePath) {
+                $relativePath = $this->relativePath($unreadablePath, $basePath);
+                $findings->addDirectoryError($relativePath, 'Unable to open directory for reading.', $this->name());
+            }
         }
 
         $this->notifyProgress('finish');

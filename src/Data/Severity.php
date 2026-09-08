@@ -12,6 +12,18 @@ enum Severity: string
     case LOW = 'LOW';
 
     /**
+     * Resolve a severity instance from a case-insensitive string name.
+     */
+    public static function tryFromString(?string $value): ?self
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return self::tryFrom(strtoupper(trim($value)));
+    }
+
+    /**
      * Get the numeric weight for sorting (higher = more severe).
      */
     public function weight(): int

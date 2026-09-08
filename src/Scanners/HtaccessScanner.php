@@ -7,7 +7,6 @@ namespace Hryagstn\Scalpel\Scanners;
 use Hryagstn\Scalpel\Data\Finding;
 use Hryagstn\Scalpel\Data\FindingCollection;
 use Hryagstn\Scalpel\Data\Severity;
-use Symfony\Component\Finder\Finder;
 
 class HtaccessScanner extends BaseScanner
 {
@@ -57,80 +56,22 @@ class HtaccessScanner extends BaseScanner
     public function scan(string $basePath): FindingCollection
     {
         $findings = new FindingCollection;
-        $excludedPaths = $this->getExcludedPaths();
 
-        // Use dedicated iterators for server config files.
-        // We do NOT use createFinder() from BaseScanner because Symfony Finder's
-        // ignoreDotFiles() affects file detection inconsistently across versions.
-        // Instead we manually glob for config files to ensure reliable detection.
-        foreach ($this->findConfigFiles($basePath, $excludedPaths, '.htaccess') as $fullPath) {
-            $relativePath = $this->relativePath($fullPath, $basePath);
-            $this->scanHtaccessFile($fullPath, $relativePath, $findings);
+        $finder = $this->createFinder($basePath, $this->getExcludedPaths())->name('.htaccess');
+
+        foreach ($finder as $file) {
+            $relativePath = $file->getRelativePathname();
+            $this->scanHtaccessFile($file->getPathname(), $relativePath, $findings);
         }
 
-        foreach ($this->findConfigFiles($basePath, $excludedPaths, '.user.ini') as $fullPath) {
-            $relativePath = $this->relativePath($fullPath, $basePath);
-            $this->scanUserIniFile($fullPath, $relativePath, $findings);
+        foreach ($finder->getUnreadablePaths() as $unreadablePath) {
+            $relativePath = $this->relativePath($unreadablePath, $basePath);
+            $findings->addDirectoryError($relativePath, 'Unable to open directory for reading.', $this->name());
         }
+
+        $findings->setScannerStatus($this->name(), $findings->hasErrors() ? 'partial' : 'complete');
 
         return $findings;
-    }
-
-    /**
-     * Find all files with the given name recursively under $basePath,
-     * respecting exclusions.
-     *
-     * Uses RecursiveDirectoryIterator directly to avoid dot-file issues with
-     * Symfony Finder across different configurations.
-     *
-     * @param  string[]  $excludedPaths
-     * @param  string  $filename  e.g. '.htaccess' or '.user.ini'
-     * @return string[]
-     */
-    private function findConfigFiles(string $basePath, array $excludedPaths, string $filename): array
-    {
-        $results = [];
-        $basePath = rtrim($basePath, '/');
-
-        try {
-            $iterator = new \RecursiveIteratorIterator(
-                new \RecursiveDirectoryIterator(
-                    $basePath,
-                    \RecursiveDirectoryIterator::SKIP_DOTS,
-                ),
-                \RecursiveIteratorIterator::SELF_FIRST,
-            );
-
-            foreach ($iterator as $file) {
-                if (! $file instanceof \SplFileInfo) {
-                    continue;
-                }
-
-                if (! $file->isFile()) {
-                    continue;
-                }
-
-                if ($file->getFilename() !== $filename) {
-                    continue;
-                }
-
-                $fullPath = $file->getRealPath();
-                if ($fullPath === false) {
-                    continue;
-                }
-                $relativePath = $this->relativePath($fullPath, $basePath);
-
-                if ($this->isExcluded($relativePath, $excludedPaths)) {
-                    continue;
-                }
-
-                $results[] = $fullPath;
-            }
-        } catch (\UnexpectedValueException $exception) {
-            throw new \RuntimeException("Unable to traverse '{$basePath}' while scanning {$filename} files.", 0, $exception);
-        }
-
-        return $results;
     }
 
     /**
@@ -144,8 +85,12 @@ class HtaccessScanner extends BaseScanner
         $handle = @fopen($filePath, 'r');
 
         if ($handle === false) {
+            $findings->addError($relativePath, 'Unable to open .htaccess file for reading.', $this->name());
+
             return;
         }
+
+        $findings->incrementScannedFiles(1);
 
         $lineNumber = 0;
 
@@ -360,64 +305,5 @@ class HtaccessScanner extends BaseScanner
             description: 'Options ExecCGI enabled — allows execution of CGI scripts in this directory.',
             scannerName: $this->name(),
         ));
-    }
-
-    /**
-     * Scan a single .user.ini file line by line.
-     *
-     * `.user.ini` is the PHP-FPM equivalent of .htaccess php_* directives and
-     * a classic persistence vector: `auto_prepend_file = shell.txt` causes
-     * the attacker's file to be executed with every PHP request.
-     */
-    private function scanUserIniFile(
-        string $filePath,
-        string $relativePath,
-        FindingCollection $findings,
-    ): void {
-        $handle = @fopen($filePath, 'r');
-
-        if ($handle === false) {
-            return;
-        }
-
-        $lineNumber = 0;
-
-        try {
-            while (($line = fgets($handle)) !== false) {
-                $lineNumber++;
-
-                // Normalize line endings, trim, and skip comments/empty lines
-                $trimmedLine = trim(str_replace(["\r\n", "\r"], "\n", $line));
-
-                if ($trimmedLine === '' || str_starts_with($trimmedLine, ';') || str_starts_with($trimmedLine, '#')) {
-                    continue;
-                }
-
-                if (preg_match('/^([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(.*)$/i', $trimmedLine, $matches) !== 1) {
-                    continue;
-                }
-
-                $directive = strtolower(trim($matches[1]));
-                $value = strtolower(trim($matches[2], " \t\"'"));
-
-                $isDangerous = match ($directive) {
-                    'auto_prepend_file', 'auto_append_file' => $value !== '',
-                    'disable_functions' => $value === '' || $value === 'none',
-                    default => false,
-                };
-
-                if ($isDangerous) {
-                    $findings->add(Finding::make(
-                        severity: Severity::CRITICAL,
-                        file: $relativePath,
-                        line: $lineNumber,
-                        description: "Dangerous .user.ini directive: '{$directive}' set to '{$value}' — commonly abused for backdoor persistence on PHP-FPM.",
-                        scannerName: $this->name(),
-                    ));
-                }
-            }
-        } finally {
-            fclose($handle);
-        }
     }
 }

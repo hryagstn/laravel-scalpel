@@ -11,6 +11,8 @@ use Hryagstn\Scalpel\Console\Concerns\OutputsFindings;
 use Hryagstn\Scalpel\Data\FindingCollection;
 use Hryagstn\Scalpel\Events\ScanFinished;
 use Hryagstn\Scalpel\Scalpel;
+use Hryagstn\Scalpel\Scanners\HtaccessScanner;
+use Hryagstn\Scalpel\Scanners\UserIniScanner;
 use Illuminate\Console\Command;
 
 final class ScalpelScanCommand extends Command
@@ -49,70 +51,72 @@ final class ScalpelScanCommand extends Command
         $this->resetFindingsState();
         $startedAt = microtime(true);
 
+        /** @var array<int, string> $contentExcluded */
+        $contentExcluded = (array) config('scalpel.content_scan_excluded_paths', []);
+
         $originalConfig = [
             'fast' => config('scalpel.baseline_fast_scan'),
             'production' => config('scalpel.assume_production'),
-            'content' => config('scalpel.content_scan_excluded_paths', []),
+            'content' => $contentExcluded,
         ];
-        if ($this->option('fast')) {
-            config(['scalpel.baseline_fast_scan' => true]);
-        }
-        if ($this->option('production')) {
-            config(['scalpel.assume_production' => true]);
-        }
-        if ($this->option('include-vendor')) {
-            $this->enableVendorContentScanning();
-        }
-
-        // Resolve early so an invalid --fail-on value warns before scanning
-        $this->failOnSeverity();
-
-        if (! $this->shouldSuppressBanner()) {
-            $this->displayBanner('Intrusion Evidence Scanner');
-        }
-
-        $basePath = (string) base_path();
-
-        /** @var string|null $onlyOption */
-        $onlyOption = $this->option('only');
-
-        $formatOption = $this->option('format');
-        $format = is_string($formatOption) ? $formatOption : 'table';
-
-        // Run scanners
-        if ($onlyOption !== null && $onlyOption !== '') {
-            $scannerClasses = $this->resolveScannerNames($onlyOption);
-            if ($scannerClasses === null) {
-                $this->restoreConfig($originalConfig);
-
-                return 2;
+        try {
+            if ($this->option('fast')) {
+                config(['scalpel.baseline_fast_scan' => true]);
             }
-            $findings = $this->runSelectedScanners($scalpel, $basePath, $scannerClasses, $format);
-        } else {
-            $findings = $this->runAllScanners($scalpel, $basePath, $format);
+            if ($this->option('production')) {
+                config(['scalpel.assume_production' => true]);
+            }
+            if ($this->option('include-vendor')) {
+                $this->enableVendorContentScanning();
+            }
+
+            // Resolve early so an invalid --fail-on value warns before scanning
+            $this->failOnSeverity();
+
+            if (! $this->shouldSuppressBanner()) {
+                $this->displayBanner('Intrusion Evidence Scanner');
+            }
+
+            $basePath = (string) base_path();
+
+            /** @var string|null $onlyOption */
+            $onlyOption = $this->option('only');
+
+            $formatOption = $this->option('format');
+            $format = is_string($formatOption) ? $formatOption : 'table';
+
+            // Run scanners
+            if ($onlyOption !== null && $onlyOption !== '') {
+                $scannerClasses = $this->resolveScannerNames($onlyOption);
+                if ($scannerClasses === null) {
+                    return 2;
+                }
+                $findings = $this->runSelectedScanners($scalpel, $basePath, $scannerClasses, $format);
+            } else {
+                $findings = $this->runAllScanners($scalpel, $basePath, $format);
+            }
+
+            // Apply severity threshold from config
+            $findings = $this->applySeverityThreshold($findings);
+
+            // Announce results to listeners (notifications, alerting, ...)
+            event(new ScanFinished($findings, 'scan', (microtime(true) - $startedAt) * 1000));
+
+            // Output results
+            if ($format === 'json') {
+                $this->outputJson($findings);
+            } elseif ($format === 'sarif') {
+                $this->outputSarif($findings);
+            } elseif ($format === 'github') {
+                $this->outputGithubAnnotations($findings);
+            } else {
+                $this->outputTable($findings);
+            }
+
+            return $this->resolveExitCode($findings);
+        } finally {
+            $this->restoreConfig($originalConfig);
         }
-
-        // Apply severity threshold from config
-        $findings = $this->applySeverityThreshold($findings);
-
-        // Announce results to listeners (notifications, alerting, ...)
-        event(new ScanFinished($findings, 'scan', (microtime(true) - $startedAt) * 1000));
-
-        // Output results
-        if ($format === 'json') {
-            $this->outputJson($findings);
-        } elseif ($format === 'sarif') {
-            $this->outputSarif($findings);
-        } elseif ($format === 'github') {
-            $this->outputGithubAnnotations($findings);
-        } else {
-            $this->outputTable($findings);
-        }
-
-        $exitCode = $this->resolveExitCode($findings);
-        $this->restoreConfig($originalConfig);
-
-        return $exitCode;
     }
 
     /**
@@ -134,10 +138,11 @@ final class ScalpelScanCommand extends Command
      * Resolve scanner aliases to their scanner class names.
      *
      * Aliases are resolved against Scalpel::SCANNER_ALIASES which maps each
-     * alias to a scanner class, so the mapping can never drift from the
-     * scanners' name() methods.
+     * alias to a scanner class. For backward compatibility, the 'htaccess' alias
+     * delegates to both HtaccessScanner and UserIniScanner so that .user.ini
+     * inspection is preserved for users relying on the legacy alias.
      *
-     * @return array<class-string>
+     * @return array<int, class-string>|null
      */
     private function resolveScannerNames(string $onlyOption): ?array
     {
@@ -166,10 +171,15 @@ final class ScalpelScanCommand extends Command
                 return null;
             }
 
-            $resolved[] = $scannerClass;
+            if ($alias === 'htaccess') {
+                $resolved[] = HtaccessScanner::class;
+                $resolved[] = UserIniScanner::class;
+            } else {
+                $resolved[] = $scannerClass;
+            }
         }
 
-        return $resolved;
+        return array_values(array_unique($resolved));
     }
 
     /** @param array{fast:mixed,production:mixed,content:array<int, string>} $configValues */

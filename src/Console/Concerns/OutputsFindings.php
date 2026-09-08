@@ -33,9 +33,14 @@ trait OutputsFindings
     {
         $payload = [
             'schema_version' => 1,
+            'status' => $findings->status(),
             'generated_at' => date('c'),
+            'scanned_files' => $findings->scannedFilesCount(),
+            'skipped_files' => $findings->skippedFilesCount(),
+            'skipped_directories' => $findings->skippedDirectoriesCount(),
             'total' => $findings->count(),
             'findings' => $findings->toArray(),
+            'errors' => $findings->errors(),
         ];
 
         $json = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
@@ -59,6 +64,16 @@ trait OutputsFindings
     {
         $results = [];
         foreach ($findings as $finding) {
+            $physicalLocation = [
+                'artifactLocation' => ['uri' => $finding->file],
+            ];
+
+            if ($finding->line !== null) {
+                $physicalLocation['region'] = [
+                    'startLine' => $finding->line,
+                ];
+            }
+
             $results[] = [
                 'ruleId' => strtolower(str_replace(' ', '-', $finding->scannerName)),
                 'level' => match ($finding->severity) {
@@ -68,18 +83,40 @@ trait OutputsFindings
                 },
                 'message' => ['text' => $finding->description],
                 'locations' => [[
+                    'physicalLocation' => $physicalLocation,
+                ]],
+            ];
+        }
+
+        $notifications = [];
+        foreach ($findings->errors() as $error) {
+            $notifications[] = [
+                'level' => 'error',
+                'message' => ['text' => "[{$error['scanner']}] {$error['error']}"],
+                'descriptor' => ['id' => strtolower(str_replace(' ', '-', $error['scanner'])).'-error'],
+                'locations' => [[
                     'physicalLocation' => [
-                        'artifactLocation' => ['uri' => $finding->file],
-                        'region' => array_filter(['startLine' => $finding->line], static fn ($value) => $value !== null),
+                        'artifactLocation' => ['uri' => $error['file']],
                     ],
                 ]],
             ];
         }
+
         $this->line((string) json_encode([
             '$schema' => 'https://json.schemastore.org/sarif-2.1.0.json',
             'version' => '2.1.0',
             'runs' => [[
                 'tool' => ['driver' => ['name' => 'Laravel Scalpel', 'version' => Scalpel::version()]],
+                'invocations' => [[
+                    'executionSuccessful' => ! $findings->hasErrors() && $findings->status() !== 'failed',
+                    'toolExecutionNotifications' => $notifications,
+                    'properties' => [
+                        'status' => $findings->status(),
+                        'scannedFiles' => $findings->scannedFilesCount(),
+                        'skippedFiles' => $findings->skippedFilesCount(),
+                        'skippedDirectories' => $findings->skippedDirectoriesCount(),
+                    ],
+                ]],
                 'results' => $results,
             ]],
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
@@ -90,8 +127,26 @@ trait OutputsFindings
      */
     protected function outputTable(FindingCollection $findings, string $cleanMessage = '✅ No findings detected. Your application looks clean!'): void
     {
+        if ($findings->hasErrors()) {
+            $statusLabel = strtoupper($findings->status());
+            $this->warn("  ⚠  Some files or directories could not be inspected (scan status: {$statusLabel}):");
+            foreach ($findings->errors() as $err) {
+                $this->line("    • [{$err['scanner']}] {$err['file']}: {$err['error']}");
+            }
+            $this->newLine();
+        }
+
         if ($findings->isEmpty()) {
-            $this->info("  {$cleanMessage}");
+            if ($findings->hasErrors()) {
+                $this->warn(sprintf(
+                    '  ⚠  No security findings detected, but the scan was %s (%d files, %d directories skipped due to read errors).',
+                    $findings->status(),
+                    $findings->skippedFilesCount(),
+                    $findings->skippedDirectoriesCount(),
+                ));
+            } else {
+                $this->info("  {$cleanMessage}");
+            }
             $this->newLine();
 
             return;

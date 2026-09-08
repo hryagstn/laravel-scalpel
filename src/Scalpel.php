@@ -12,6 +12,7 @@ use Hryagstn\Scalpel\Scanners\EnvIntegrityScanner;
 use Hryagstn\Scalpel\Scanners\HtaccessScanner;
 use Hryagstn\Scalpel\Scanners\ObfuscatedCodeScanner;
 use Hryagstn\Scalpel\Scanners\StructuralAnomalyScanner;
+use Hryagstn\Scalpel\Scanners\UserIniScanner;
 
 final class Scalpel
 {
@@ -28,6 +29,7 @@ final class Scalpel
         'structural' => StructuralAnomalyScanner::class,
         'obfuscated' => ObfuscatedCodeScanner::class,
         'htaccess' => HtaccessScanner::class,
+        'userini' => UserIniScanner::class,
         'baseline' => BaselineDiffScanner::class,
         'env' => EnvIntegrityScanner::class,
     ];
@@ -110,6 +112,7 @@ final class Scalpel
             new StructuralAnomalyScanner,
             new ObfuscatedCodeScanner,
             new HtaccessScanner,
+            new UserIniScanner,
             new BaselineDiffScanner,
             new EnvIntegrityScanner,
         ];

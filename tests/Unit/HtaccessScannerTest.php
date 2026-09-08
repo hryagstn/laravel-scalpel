@@ -88,33 +88,25 @@ class HtaccessScannerTest extends TestCase
         $this->assertStringContainsString('auto_prepend_file', $findings->all()[0]->description);
     }
 
-    public function test_flags_malicious_user_ini(): void
+    public function test_reports_error_for_unreadable_htaccess(): void
     {
-        @mkdir($this->tempDir.'/public', 0777, true);
-        file_put_contents($this->tempDir.'/public/.user.ini', "; PHP-FPM config\nauto_prepend_file = c99.txt\ndisable_functions = \n");
+        $htaccessPath = $this->tempDir.'/.htaccess';
+        file_put_contents($htaccessPath, 'AddHandler cgi-script .py');
+        @chmod($htaccessPath, 0000);
 
-        $scanner = new HtaccessScanner;
-        $findings = $scanner->scan($this->tempDir);
-
-        $this->assertGreaterThanOrEqual(2, count($findings));
-
-        $descriptions = array_map(fn ($f) => $f->description, $findings->all());
-        $this->assertNotEmpty(array_filter($descriptions, fn ($d) => str_contains((string) $d, 'auto_prepend_file')));
-
-        foreach ($findings->all() as $finding) {
-            $this->assertEquals('CRITICAL', $finding->severity->value);
-            $this->assertStringEndsWith('.user.ini', $finding->file);
+        if (@fopen($htaccessPath, 'r') !== false) {
+            @chmod($htaccessPath, 0644);
+            $this->markTestSkipped('Cannot make file unreadable in this environment.');
         }
-    }
-
-    public function test_ignores_benign_user_ini(): void
-    {
-        file_put_contents($this->tempDir.'/.user.ini', "upload_max_filesize = 10M\nmemory_limit = 256M\n");
 
         $scanner = new HtaccessScanner;
         $findings = $scanner->scan($this->tempDir);
 
-        $this->assertCount(0, $findings);
+        @chmod($htaccessPath, 0644);
+
+        $this->assertTrue($findings->hasErrors());
+        $this->assertEquals('partial', $findings->status());
+        $this->assertEquals(1, $findings->skippedFilesCount());
     }
 
     public function test_flags_external_redirects(): void
