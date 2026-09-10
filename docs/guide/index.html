@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Laravel Scalpel Docs</title>
+  <meta name="description" content="Laravel Scalpel installation, commands, configuration, and security model.">
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body class="docs-page">
+  <header class="site-header"><div class="container header-container">
+    <a href="../" class="logo-wrapper"><img src="../logo.png" alt="" class="header-logo" width="32" height="32"><span class="logo-text">Laravel <span class="accent-text">Scalpel</span></span></a>
+    <a href="../" class="btn btn-outline btn-sm">Back to overview</a>
+  </div></header>
+  <main class="docs-layout container">
+    <aside class="docs-sidebar" aria-label="Documentation navigation">
+      <p class="section-subtitle">DOCUMENTATION</p>
+      <nav><a href="#installation">Installation</a><a href="#commands">Commands</a><a href="#configuration">Configuration</a><a href="#findings">Findings</a><a href="#security">Security model</a></nav>
+    </aside>
+    <article class="docs-content">
+      <span class="section-subtitle">LARAVEL SCALPEL DOCS</span>
+      <h1>Operate with evidence.</h1>
+      <p class="docs-intro">Use this guide to install the package, run scans, interpret findings, and harden the workflow around it.</p>
+      <section id="installation"><h2>Installation</h2><p>Laravel Scalpel requires PHP 8.2+ and supports Laravel 10 through 13.</p><pre><code>composer require hryagstn/laravel-scalpel
+php artisan vendor:publish --tag=scalpel-config</code></pre></section>
+      <section id="commands"><h2>Commands</h2><div class="docs-command"><code>php artisan scalpel:scan</code><span>Scan for structural, obfuscation, server-rule, and environment findings.</span></div><div class="docs-command"><code>php artisan scalpel:baseline</code><span>Save a trusted cryptographic snapshot of the project.</span></div><div class="docs-command"><code>php artisan scalpel:diff</code><span>Compare the current filesystem against the saved baseline.</span></div><div class="docs-command"><code>php artisan scalpel:verify</code><span>Verify the integrity signature on a signed report.</span></div></section>
+      <section id="configuration"><h2>Configuration</h2><p>Adjust <code>config/scalpel.php</code> to declare non-PHP zones, allowed files, excluded paths, obfuscation patterns, severity thresholds, and report signing.</p><pre><code>'non_php_zones' =&gt; ['public', 'storage'],
+'excluded_paths' =&gt; ['node_modules', '.git'],
+'signing' =&gt; ['enabled' =&gt; env('SCALPEL_SIGNING_ENABLED', false)],</code></pre></section>
+      <section id="findings"><h2>Understanding findings</h2><p>Review the file path, line, scanner, and severity together. Treat CRITICAL findings as an incident signal and preserve the JSON output for investigation.</p></section>
+      <section id="security"><h2>Security model</h2><p>Scalpel is a detection layer running inside the application workspace. Run it from a protected cron or CI context, use a distinct user where possible, and enable HMAC signing when reports cross a trust boundary.</p></section>
+    </article>
+  </main>
+</body>
+</html>

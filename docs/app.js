@@ -103,12 +103,26 @@ document.addEventListener('DOMContentLoaded', () => {
             const target = btn.getAttribute('data-target');
 
             // Toggle buttons
-            codeTabBtns.forEach(b => b.setAttribute('aria-selected', 'false'));
+            codeTabBtns.forEach(b => {
+                b.classList.remove('active');
+                b.setAttribute('aria-selected', 'false');
+                b.setAttribute('tabindex', '-1');
+            });
+            btn.classList.add('active');
             btn.setAttribute('aria-selected', 'true');
+            btn.setAttribute('tabindex', '0');
 
             // Toggle panels
-            codePanels.forEach(p => p.classList.remove('active'));
-            document.getElementById(target).classList.add('active');
+            codePanels.forEach(p => {
+                p.classList.remove('active');
+                p.hidden = true;
+            });
+
+            const targetPanel = document.getElementById(target);
+            if (targetPanel) {
+                targetPanel.classList.add('active');
+                targetPanel.hidden = false;
+            }
         });
     });
 
