@@ -5,6 +5,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="dark light">
 
     <!-- SEO Meta Tags -->
     <title>Laravel Scalpel - Intrusion Evidence Scanner for Laravel</title>
@@ -77,19 +78,9 @@
 
             <nav class="main-nav" aria-label="Main Navigation">
                 <ul>
-                    <li><a href="#threat-model">Why Scalpel?</a></li>
-                    <li><a href="#scanners">Scanners</a></li>
-                    <li><a href="#security-model">Security Model</a></li>
-                    <li><a href="#config-reference">Configuration</a></li>
+                    <li><a href="#overview">Overview</a></li>
                     <li><a href="#quick-start">Quick Start</a></li>
-                    <li class="dropdown">
-                        <a href="#other-tools" class="dropdown-trigger">Other Tools <span
-                                class="chevron-icon">▼</span></a>
-                        <ul class="dropdown-menu">
-                            <li><a href="https://github.com/hryagstn/n8n-bastion" target="_blank"
-                                    rel="noopener">n8n-bastion</a></li>
-                        </ul>
-                    </li>
+                    <li><a href="guide/">Docs</a></li>
                 </ul>
             </nav>
 
@@ -118,13 +109,9 @@
     <div class="mobile-nav-overlay" id="mobile-nav">
         <nav class="mobile-nav-menu">
             <ul>
-                <li><a href="#threat-model">Why Scalpel?</a></li>
-                <li><a href="#scanners">Scanners</a></li>
-                <li><a href="#security-model">Security Model</a></li>
-                <li><a href="#config-reference">Configuration</a></li>
+                <li><a href="#overview">Overview</a></li>
                 <li><a href="#quick-start">Quick Start</a></li>
-                <li><a href="https://github.com/hryagstn/n8n-bastion" target="_blank" rel="noopener">n8n-bastion</a>
-                </li>
+                <li><a href="guide/">Docs</a></li>
                 <li><a href="https://github.com/hryagstn/laravel-scalpel" target="_blank" rel="noopener"
                         class="btn btn-primary btn-sm">GitHub</a></li>
             </ul>
@@ -142,12 +129,10 @@
                     <span class="badge-text">Filesystem-Level Forensic Security for Laravel</span>
                 </div>
                 <h1 class="hero-title">
-                    Detect compromised files, backdoors, and filesystem anomalies <span
-                        class="gradient-text">instantly</span>.
+                    Find intrusion evidence in your Laravel app <span class="gradient-text">before it spreads.</span>
                 </h1>
                 <p class="hero-lead">
-                    A zero-dependency, filesystem-level forensic scanner that monitors your Laravel codebase. Find
-                    hidden webshells, tampered configuration, and unexpected PHP payloads before they impact your users.
+                    Scan the filesystem for rogue PHP, tampered server rules, and unexpected changes. Get an evidence-first report from a zero-dependency Artisan package.
                 </p>
                 <div class="hero-buttons">
                     <a href="#quick-start" class="btn btn-primary btn-lg">
@@ -165,6 +150,11 @@
                         </svg>
                         <span>GitHub Repository</span>
                     </a>
+                </div>
+                <div class="hero-command" aria-label="Install Laravel Scalpel">
+                    <span class="hero-command-prompt">$</span>
+                    <code>composer require hryagstn/laravel-scalpel</code>
+                    <button class="btn-copy-input" data-copy="composer require hryagstn/laravel-scalpel" aria-label="Copy install command">Copy</button>
                 </div>
             </div>
 
@@ -194,6 +184,7 @@
                     </div>
                     <div class="terminal-body" id="terminal-content">
                         <!-- Content will be dynamically inserted here via app.js -->
+                        <noscript><code class="terminal-noscript">$ php artisan scalpel:scan<br><span class="text-red">CRITICAL</span> 1 finding requires investigation</code></noscript>
                     </div>
                 </div>
                 <div class="terminal-controls">
@@ -207,14 +198,13 @@
     </section>
 
     <!-- The Threat Model / Problem Section -->
-    <section id="threat-model" class="threat-section">
+    <section id="overview" class="threat-section">
         <div class="container">
             <div class="section-header">
                 <span class="section-subtitle">THE THREAT MODEL</span>
-                <h2 class="section-title">Why configuration audits aren't enough</h2>
+                <h2 class="section-title">See what changed on disk</h2>
                 <p class="section-lead">
-                    Static analysis tools audit your code configuration for vulnerability paths, but what happens when
-                    an attacker successfully bypasses your filters and uploads a backdoor?
+                    Application logs tell you what ran. Scalpel checks what is actually present in your project and highlights evidence that needs investigation.
                 </p>
             </div>
 
@@ -475,24 +465,24 @@
             </div>
 
             <div class="code-tabs-container">
-                <div class="code-tabs-sidebar">
+                <div class="code-tabs-sidebar" role="tablist" aria-label="Configuration examples">
                     <button class="code-tab-btn active" data-target="tab-code-config" role="tab" aria-selected="true"
-                        aria-controls="tab-code-config" id="code-tab-config">
-                        <span class="tab-label">config/scalpel.php</span>
+                        aria-controls="tab-code-config" id="code-tab-config" tabindex="0">
+                        <span class="tab-label">config/<wbr>scalpel.php</span>
                         <span class="tab-desc">Package configuration</span>
                     </button>
                     <button class="code-tab-btn" data-target="tab-code-ci" role="tab" aria-selected="false"
-                        aria-controls="tab-code-ci" id="code-tab-ci">
-                        <span class="tab-label">github-actions.yml</span>
+                        aria-controls="tab-code-ci" id="code-tab-ci" tabindex="-1">
+                        <span class="tab-label">github-<wbr>actions.yml</span>
                         <span class="tab-desc">CI/CD security gate</span>
                     </button>
                     <button class="code-tab-btn" data-target="tab-code-n8n" role="tab" aria-selected="false"
-                        aria-controls="tab-code-n8n" id="code-tab-n8n">
+                        aria-controls="tab-code-n8n" id="code-tab-n8n" tabindex="-1">
                         <span class="tab-label">n8n Bastion Alert</span>
                         <span class="tab-desc">Real-time alerts via Telegram</span>
                     </button>
                     <button class="code-tab-btn" data-target="tab-code-event" role="tab" aria-selected="false"
-                        aria-controls="tab-code-event" id="code-tab-event">
+                        aria-controls="tab-code-event" id="code-tab-event" tabindex="-1">
                         <span class="tab-label">ScanFinished Event</span>
                         <span class="tab-desc">Native Laravel alerting</span>
                     </button>
@@ -589,7 +579,7 @@
                     </div>
 
                     <!-- Tab Panel 2: CI/CD -->
-                    <div class="code-panel" id="tab-code-ci" role="tabpanel" aria-labelledby="code-tab-ci">
+                    <div class="code-panel" id="tab-code-ci" role="tabpanel" aria-labelledby="code-tab-ci" hidden>
                         <div class="panel-meta">
                             <span class="file-path">.github/workflows/security.yml</span>
                             <button class="btn-copy-code" data-clipboard="code-ci-content">Copy YAML</button>
@@ -633,7 +623,7 @@
                     </div>
 
                     <!-- Tab Panel 3: n8n Integration -->
-                    <div class="code-panel" id="tab-code-n8n" role="tabpanel" aria-labelledby="code-tab-n8n">
+                    <div class="code-panel" id="tab-code-n8n" role="tabpanel" aria-labelledby="code-tab-n8n" hidden>
                         <div class="panel-meta">
                             <span class="file-path">Integrate with n8n-bastion</span>
                             <button class="btn-copy-code" data-clipboard="code-n8n-content">Copy Script</button>
@@ -656,7 +646,7 @@ EXIT_CODE=$?
                     </div>
 
                     <!-- Tab Panel 4: Laravel Event -->
-                    <div class="code-panel" id="tab-code-event" role="tabpanel" aria-labelledby="code-tab-event">
+                    <div class="code-panel" id="tab-code-event" role="tabpanel" aria-labelledby="code-tab-event" hidden>
                         <div class="panel-meta">
                             <span class="file-path">app/Providers/AppServiceProvider.php</span>
                             <button class="btn-copy-code" data-clipboard="code-event-content">Copy PHP</button>
