@@ -1553,6 +1553,12 @@ section[id] {
         background: transparent;
         box-shadow: none;
     }
+
+    .main-nav a:hover,
+    .main-nav li.active a,
+    .mobile-nav-menu a:hover {
+        color: #172033 !important;
+    }
 }
 
 @media (prefers-color-scheme: light) {
