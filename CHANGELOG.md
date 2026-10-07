@@ -5,6 +5,15 @@ All notable changes to `laravel-scalpel` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.0] - 2026-10-07
+
+### Added
+- **Allowed .htaccess redirect hosts configuration** ([#16](https://github.com/hryagstn/laravel-scalpel/pull/16)). Added `htaccess_allowed_redirect_hosts` (default `[]`) to `config/scalpel.php` to explicitly allow trusted external redirect destinations (e.g. CDNs or apex domains) in `RewriteRule` directives. Matching is case-insensitive and port-independent.
+
+### Fixed
+- **Stop `variable_variables` false positives on compiled Blade views** ([#9](https://github.com/hryagstn/laravel-scalpel/pull/9)). Compiled Blade views (`storage/framework/views`) emit variable variables for `@props` and `@aware` directives (`$$__key = $$__key ?? $__value`, `unset($$__key)`, and `$$__consumeVariable = ...`), generating hundreds of false positive MEDIUM findings on standard component-heavy applications. These exact compiled statements are now blanked prior to pattern matching while preserving newlines and line numbers. Malicious re-use of `$$__*` names or execution of user input remains strictly detected, and compiled views remain fully content-scanned for webshells and other obfuscation patterns.
+- **`.htaccess` self-referential redirects no longer flagged as external redirects** ([#16](https://github.com/hryagstn/laravel-scalpel/pull/16)). Standard force-HTTPS rules (e.g. `RewriteRule (.*) https://%{HTTP_HOST}/$1 [R=301,L]`, using `%{HTTP_HOST}`, `%{SERVER_NAME}`, or `%{HTTP:Host}`, optionally with ports or `%{REQUEST_URI}`) are now recognized as internal rather than flagged as HIGH phishing/traffic hijacking redirects. The scanner parses target URLs to isolate the authority, strips userinfo to prevent evasion (e.g. `https://%{HTTP_HOST}@evil.com` remains HIGH), and displays the extracted external host name in findings.
+
 ## [1.10.0] - 2026-10-04
 
 ### Removed
