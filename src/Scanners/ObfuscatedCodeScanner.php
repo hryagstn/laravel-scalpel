@@ -48,6 +48,18 @@ class ObfuscatedCodeScanner extends BaseScanner
         'file_put_contents_encoded',
     ];
 
+    /**
+     * Whole statements Blade's props and aware directives compile to, taken
+     * verbatim from CompilesComponents.
+     *
+     * @var string[]
+     */
+    private const COMPILED_BLADE_VARIABLE_VARIABLES = [
+        '/\$\$__key\s*=\s*\$\$__key\s*\?\?\s*\$__value\s*;/',
+        '/unset\s*\(\s*\$\$__key\s*\)\s*;/',
+        '/\$\$__consumeVariable\s*=\s*is_string\(\s*\$__key\s*\)\s*\?\s*\$__env->getConsumableComponentData\(\s*\$__key\s*,\s*\$__value\s*\)\s*:\s*\$__env->getConsumableComponentData\(\s*\$__value\s*\)\s*;/',
+    ];
+
     public function name(): string
     {
         return 'Obfuscated Code';
@@ -142,6 +154,11 @@ class ObfuscatedCodeScanner extends BaseScanner
 
                     continue;
                 }
+                if ($key === 'variable_variables') {
+                    $this->checkVariableVariables($code, $relativePath, $patternDef, $findings);
+
+                    continue;
+                }
                 if (in_array($key, ['long_encoded_string', 'variable_functions', 'chr_chaining'], true)) {
                     foreach (explode("\n", $code) as $index => $line) {
                         $lineNumber = $index + 1;
@@ -229,6 +246,49 @@ class ObfuscatedCodeScanner extends BaseScanner
                 severity: $patternDef['severity'],
                 file: $relativePath,
                 line: $lineNumber,
+                description: $patternDef['description'],
+                scannerName: $this->name(),
+            ));
+        }
+    }
+
+    /**
+     * Check for variable variables ($$var).
+     *
+     * Compiled Blade views are full of them, so the statements Blade emits are
+     * blanked before matching. Blanking statements rather than exempting names
+     * keeps $$__key reported when it is called or assigned from input.
+     *
+     * @param  array{pattern: string, severity: Severity, description: string}  $patternDef
+     */
+    private function checkVariableVariables(
+        string $code,
+        string $relativePath,
+        array $patternDef,
+        FindingCollection $findings,
+    ): void {
+        if (! str_contains($code, '$$')) {
+            return;
+        }
+
+        // Blanked rather than removed, so line numbers still match the source.
+        foreach (self::COMPILED_BLADE_VARIABLE_VARIABLES as $statement) {
+            $code = preg_replace_callback(
+                $statement,
+                static fn (array $match): string => preg_replace('/[^\r\n]/', ' ', $match[0]) ?? '',
+                $code,
+            ) ?? $code;
+        }
+
+        if (! preg_match_all($patternDef['pattern'], $code, $matches, PREG_OFFSET_CAPTURE)) {
+            return;
+        }
+
+        foreach ($matches[0] as $match) {
+            $findings->add(Finding::make(
+                severity: $patternDef['severity'],
+                file: $relativePath,
+                line: substr_count(substr($code, 0, $match[1]), "\n") + 1,
                 description: $patternDef['description'],
                 scannerName: $this->name(),
             ));

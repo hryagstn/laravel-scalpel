@@ -31,6 +31,7 @@ class ObfuscatedCodeScannerTest extends TestCase
                 'chr_chaining' => true,
                 'hex_escape_sequence' => true,
                 'dynamic_include' => true,
+                'variable_variables' => true,
             ],
             'scalpel.long_string_threshold' => 50, // lower for easier testing
         ]);
@@ -337,6 +338,145 @@ class ObfuscatedCodeScannerTest extends TestCase
         $this->assertCount(0, $findings);
 
         @unlink($this->tempDir.'/test.php');
+    }
+
+    public function test_variable_variables_are_detected(): void
+    {
+        file_put_contents($this->tempDir.'/test.php', '<?php $$payload($_GET["c"]);');
+
+        $scanner = new ObfuscatedCodeScanner;
+        $findings = $scanner->scan($this->tempDir);
+
+        $this->assertCount(1, $findings);
+        $this->assertEquals('MEDIUM', $findings->all()[0]->severity->value);
+        $this->assertStringContainsString('Variable variables', $findings->all()[0]->description);
+    }
+
+    public function test_compiled_blade_props_are_not_flagged_as_variable_variables(): void
+    {
+        // Verbatim compileProps() output, emitted by every @props component.
+        file_put_contents($this->tempDir.'/compiled.php', <<<'PHP'
+            <?php $attributes ??= new \Illuminate\View\ComponentAttributeBag;
+
+            $__newAttributes = [];
+            $__propNames = \Illuminate\View\ComponentAttributeBag::extractPropNames(['label']);
+
+            foreach ($attributes->all() as $__key => $__value) {
+                if (in_array($__key, $__propNames)) {
+                    $$__key = $$__key ?? $__value;
+                } else {
+                    $__newAttributes[$__key] = $__value;
+                }
+            }
+
+            foreach (array_filter(['label'], 'is_string', ARRAY_FILTER_USE_KEY) as $__key => $__value) {
+                $$__key = $$__key ?? $__value;
+            }
+
+            $__defined_vars = get_defined_vars();
+
+            foreach ($attributes->all() as $__key => $__value) {
+                if (array_key_exists($__key, $__defined_vars)) unset($$__key);
+            }
+            PHP);
+
+        $scanner = new ObfuscatedCodeScanner;
+        $findings = $scanner->scan($this->tempDir);
+
+        $this->assertCount(0, $findings);
+    }
+
+    public function test_compiled_blade_aware_is_not_flagged_as_variable_variables(): void
+    {
+        // Verbatim compileAware() output, emitted by every @aware component.
+        file_put_contents($this->tempDir.'/compiled.php', <<<'PHP'
+            <?php foreach (['theme'] as $__key => $__value) {
+                $__consumeVariable = is_string($__key) ? $__key : $__value;
+                $$__consumeVariable = is_string($__key) ? $__env->getConsumableComponentData($__key, $__value) : $__env->getConsumableComponentData($__value);
+            } ?>
+            PHP);
+
+        $scanner = new ObfuscatedCodeScanner;
+        $findings = $scanner->scan($this->tempDir);
+
+        $this->assertCount(0, $findings);
+    }
+
+    public static function bladeNameReuseProvider(): array
+    {
+        // The exemption covers whole compiled statements, not variable names,
+        // so a payload cannot borrow it by reusing Blade's internal names.
+        return [
+            'call through an unrelated $$__ name' => ['<?php $$__cmd($_GET["c"]);'],
+            'call through Blade\'s own $$__key' => ['<?php $$__key($_GET["c"]);'],
+            'assignment to $$__key from input' => ['<?php $$__key = $_GET["c"];'],
+            'unset of a different $$__ name' => ['<?php unset($$__cmd);'],
+            'aware statement with a rewritten body' => ['<?php $$__consumeVariable = is_string($__key) ? $_GET["c"] : 1;'],
+        ];
+    }
+
+    #[DataProvider('bladeNameReuseProvider')]
+    public function test_blade_internal_names_are_still_flagged_outside_compiled_statements(string $code): void
+    {
+        file_put_contents($this->tempDir.'/test.php', $code);
+
+        $scanner = new ObfuscatedCodeScanner;
+        $findings = $scanner->scan($this->tempDir);
+
+        $this->assertCount(1, $findings);
+        $this->assertEquals('MEDIUM', $findings->all()[0]->severity->value);
+        $this->assertStringContainsString('Variable variables', $findings->all()[0]->description);
+    }
+
+    public function test_aware_exemption_does_not_swallow_an_executing_body(): void
+    {
+        // Shaped like compileAware() but executing input, so both the
+        // variable variable and the shell call must still be reported.
+        file_put_contents(
+            $this->tempDir.'/test.php',
+            '<?php $$__consumeVariable = is_string($__key) ? system($_GET["c"]) : 1;',
+        );
+
+        $scanner = new ObfuscatedCodeScanner;
+        $findings = $scanner->scan($this->tempDir);
+
+        $this->assertCount(2, $findings);
+
+        $descriptions = implode("\n", array_map(fn ($finding) => $finding->description, $findings->all()));
+        $this->assertStringContainsString('Variable variables', $descriptions);
+        $this->assertStringContainsString('Direct execution of superglobal input', $descriptions);
+    }
+
+    public function test_variable_variables_report_the_original_line_number(): void
+    {
+        // Blanking the exempt statements above must not shift the payload's line.
+        file_put_contents($this->tempDir.'/compiled.php', <<<'PHP'
+            <?php
+            $$__key = $$__key ?? $__value;
+            unset($$__key);
+            $$__cmd($_GET["c"]);
+            PHP);
+
+        $scanner = new ObfuscatedCodeScanner;
+        $findings = $scanner->scan($this->tempDir);
+
+        $this->assertCount(1, $findings);
+        $this->assertEquals(4, $findings->all()[0]->line);
+    }
+
+    public function test_compiled_view_directory_is_still_content_scanned(): void
+    {
+        mkdir($this->tempDir.'/storage/framework/views', 0777, true);
+        file_put_contents(
+            $this->tempDir.'/storage/framework/views/abc123.php',
+            '<?php eval(base64_decode("cGhwaW5mbygpOw=="));',
+        );
+
+        $scanner = new ObfuscatedCodeScanner;
+        $findings = $scanner->scan($this->tempDir);
+
+        $this->assertCount(1, $findings);
+        $this->assertEquals('CRITICAL', $findings->all()[0]->severity->value);
     }
 
     public function test_backtick_operator_is_detected(): void
