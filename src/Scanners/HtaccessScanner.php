@@ -48,6 +48,12 @@ class HtaccessScanner extends BaseScanner
         'text/x-perl',
     ];
 
+    /**
+     * Redirect targets whose host is built entirely from the request's own host.
+     */
+    private const SELF_REFERENTIAL_HOST_PATTERN =
+        '/^%\{(?:HTTP_HOST|SERVER_NAME|HTTP:Host)\}(?::(?:\d+|%\{SERVER_PORT\}))?(?:%\{REQUEST_URI\})?$/i';
+
     public function name(): string
     {
         return 'Htaccess';
@@ -265,6 +271,9 @@ class HtaccessScanner extends BaseScanner
 
     /**
      * Check for RewriteRule redirecting unconditionally to external domains.
+     *
+     * Only the host portion is inspected, so the standard force-HTTPS rule is
+     * internal while a literal host carrying %{HTTP_HOST} along is not.
      */
     private function checkExternalRewrite(
         string $line,
@@ -272,7 +281,19 @@ class HtaccessScanner extends BaseScanner
         string $relativePath,
         FindingCollection $findings,
     ): void {
-        if (preg_match('/^RewriteRule\s+\S+\s+(https?:\/\/)/i', $line) !== 1) {
+        if (preg_match('/^RewriteRule\s+\S+\s+(\S+)/i', $line, $matches) !== 1) {
+            return;
+        }
+
+        $target = $matches[1];
+
+        if (preg_match('#^https?://#i', $target) !== 1) {
+            return;
+        }
+
+        $host = $this->rewriteTargetHost($target);
+
+        if ($this->isSelfReferentialHost($host) || $this->isAllowedRedirectHost($host)) {
             return;
         }
 
@@ -280,9 +301,60 @@ class HtaccessScanner extends BaseScanner
             severity: Severity::HIGH,
             file: $relativePath,
             line: $lineNumber,
-            description: 'RewriteRule redirects to an external URL — may be used for phishing or traffic hijacking.',
+            description: "RewriteRule redirects to external host '{$host}' — may be used for phishing or traffic hijacking.",
             scannerName: $this->name(),
         ));
+    }
+
+    /**
+     * Extract the host portion of a RewriteRule substitution target.
+     */
+    private function rewriteTargetHost(string $target): string
+    {
+        $withoutScheme = (string) preg_replace('#^https?://#i', '', $target);
+        $authority = substr($withoutScheme, 0, strcspn($withoutScheme, '/?#'));
+
+        // Anything before the last '@' is userinfo, not the host the browser goes to.
+        $userInfoEnd = strrpos($authority, '@');
+
+        return $userInfoEnd === false ? $authority : substr($authority, $userInfoEnd + 1);
+    }
+
+    /**
+     * Determine whether the redirect target resolves to the requesting host.
+     */
+    private function isSelfReferentialHost(string $host): bool
+    {
+        return preg_match(self::SELF_REFERENTIAL_HOST_PATTERN, $host) === 1;
+    }
+
+    /**
+     * Determine whether the redirect target is an explicitly permitted host.
+     */
+    private function isAllowedRedirectHost(string $host): bool
+    {
+        /** @var string[] $allowedHosts */
+        $allowedHosts = config('scalpel.htaccess_allowed_redirect_hosts', []);
+
+        if ($allowedHosts === []) {
+            return false;
+        }
+
+        $host = strtolower($host);
+
+        // Ignore any port suffix so 'example.com' also matches 'example.com:8443'.
+        $portPosition = strrpos($host, ':');
+        if ($portPosition !== false && ctype_digit(substr($host, $portPosition + 1))) {
+            $host = substr($host, 0, $portPosition);
+        }
+
+        foreach ($allowedHosts as $allowedHost) {
+            if (strtolower(trim($allowedHost)) === $host) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

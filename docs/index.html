@@ -528,6 +528,9 @@
         <span class="string">'bootstrap/cache'</span>,
     ],
 
+    <span class="comment">// Hosts a RewriteRule may redirect to (self-redirects are always allowed)</span>
+    <span class="string">'htaccess_allowed_redirect_hosts'</span> => [],
+
     <span class="comment">// Extensions treated as executable PHP (incl. disguised webshells)</span>
     <span class="string">'suspicious_php_extensions'</span> => [
         <span class="string">'php'</span>, <span class="string">'pht'</span>, <span class="string">'phtm'</span>, <span class="string">'phtml'</span>, <span class="string">'phar'</span>, <span class="string">'php5'</span>,
