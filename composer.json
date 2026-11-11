@@ -15,7 +15,8 @@
     "authors": [
         {
             "name": "Harry Agustiana",
-            "email": "harry.agustiana@gmail.com"
+            "email": "harry.agustiana@gmail.com",
+            "homepage": "https://wanohdigital.biz.id"
         }
     ],
     "require": {

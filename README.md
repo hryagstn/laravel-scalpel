@@ -712,6 +712,14 @@ Please make sure your code follows the existing style and includes appropriate t
 
 ---
 
+## Author & Commercial Support
+
+[Harry Agustiana](https://github.com/hryagstn), founder of [Wanoh Digital](https://wanohdigital.biz.id) in Bandung, Indonesia, maintains Laravel Scalpel.
+
+If your Laravel or PHP application is serving injected spam pages, webshells, or unauthorized redirects and your team needs hands-on cleanup and server hardening, see [Wanoh Digital Incident Recovery](https://wanohdigital.biz.id/website-kena-hack) or request a free external check at [wanohdigital.biz.id/cek-website](https://wanohdigital.biz.id/cek-website).
+
+---
+
 ## 📄 License
 
 Laravel Scalpel is open-sourced software licensed under the [MIT License](LICENSE).
